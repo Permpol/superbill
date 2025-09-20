@@ -498,10 +498,15 @@
         </div>
     </div>
 
-    <!-- Load Google API -->
-    <script src="https://apis.google.com/js/api.js"></script>
-    // index.html (ช่วงบน)
-    <script src="env.js"></script>
+    <button id="googleAuthBtn">🔐 เข้าสู่ระบบ Google</button>
+  <button id="fetchDriveBtn" disabled>📄 ดึงรายชื่อไฟล์จาก Google Drive</button>
+
+  <pre id="output"></pre>
+
+  <!-- Google API -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <!-- Configuration -->
+  <script src="env.js"></script>
 <script>
   const CLIENT_ID = window.ENV.GOOGLE_CLIENT_ID;
   const API_KEY = window.ENV.GOOGLE_API_KEY;
@@ -1103,21 +1108,32 @@ function escapeHtml(str) {
         .replace(/'/g, "&#39;");
 }
 
-// === Initialize Google API on Load ===
-function isInvalidConfig() {
-    return (
-        !CLIENT_ID || CLIENT_ID.includes("default") ||
-        !API_KEY || API_KEY.length < 20
-    );
+function createTotalSummaryMessage(info) {
+    const resultHTML = `
+        <div class="message-content">
+            <div class="summary-card" style="background: linear-gradient(135deg,#ff512f 0%,#dd2476 100%);">
+                <h3>📊 สรุปผลการประมวลผลแบบ Parallel</h3>
+                <div>✅ จำนวนไฟล์ทั้งหมด: ${info.fileCount} ไฟล์</div>
+                <div>🎯 ประมวลผลสำเร็จ: ${info.successCount} ไฟล์</div>
+                <div>❌ เกิดข้อผิดพลาด: ${info.errorCount} ไฟล์</div>
+                ${info.googleDriveUrl ? `<div>🔗 Google Drive: เชื่อมต่อแล้ว</div>` : ''}
+                <div style="margin-top:8px; font-size:13px; text-align:left;">
+                    🟢 เริ่มทั้งหมด: ${escapeHtml(info.startDateAll)}<br>
+                    🔴 จบทั้งหมด: ${escapeHtml(info.endDateAll)}<br>
+                    ⏱ ใช้เวลารวม: ${escapeHtml(info.durationAllSec)} วินาที (~${escapeHtml(info.durationAllMin)} นาที)<br>
+                    ⚡ ความเร็วเฉลี่ย: ${(info.fileCount / parseFloat(info.durationAllSec)).toFixed(2)} ไฟล์/วินาที
+                </div>
+            </div>
+        </div>`;
+
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message bot";
+    msgDiv.innerHTML = resultHTML;
+
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-window.onload = function () {
-    if (isInvalidConfig()) {
-        showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ให้ถูกต้องก่อนใช้งาน', 'error');
-        googleAuthBtn.disabled = true;
-        fetchDriveBtn.disabled = true;
-        googleAuthBtn.textContent = '⚠️ ตั้งค่า API ก่อน';
-    } else {
-        initGoogleAPI();
-    }
-};
+    </script>
+</body>
+</html>
