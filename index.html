@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Bill Calculator Bot</title>
+    <title>Enhanced MCP Bill Calculator Bot with Google Drive</title>
     <style>
         * {
             margin: 0;
@@ -109,6 +109,60 @@
 
         .input-section {
             display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .google-sheets-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            border-radius: 10px;
+            border-left: 4px solid #4facfe;
+        }
+
+        .sheets-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .sheets-input:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .sheets-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .sheets-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+        }
+
+        .sheets-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .file-upload-section {
+            display: flex;
             gap: 10px;
             align-items: center;
         }
@@ -187,6 +241,61 @@
             border-radius: 6px;
             margin-top: 8px;
             font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .processing-status {
+            background: #fff3e0;
+            border: 1px solid #ffb74d;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            transition: width 0.3s ease;
+        }
+
+        .task-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 6px;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+
+        .task-item.processing {
+            border-left-color: #ff9800;
+        }
+
+        .task-item.completed {
+            border-left-color: #4caf50;
+        }
+
+        .task-item.error {
+            border-left-color: #f44336;
         }
 
         .results-container {
@@ -208,7 +317,6 @@
             margin-bottom: 8px;
         }
 
-        /* ปรับปรุงตารางแนวนอน */
         .horizontal-table-container {
             margin: 15px 0;
             overflow-x: auto;
@@ -241,10 +349,6 @@
             min-width: 100px;
         }
 
-        .horizontal-table thead th:last-child {
-            border-right: none;
-        }
-
         .horizontal-table tbody td {
             padding: 8px 6px;
             border-bottom: 1px solid #eee;
@@ -259,20 +363,6 @@
             min-width: 100px;
         }
 
-        .horizontal-table tbody td:last-child {
-            border-right: none;
-        }
-
-        .horizontal-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-
-        .horizontal-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* ตารางแนวนอนทั้งหมด - ลบ CSS ตารางแนวตั้งออก */
-
         .section-title {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -282,27 +372,6 @@
             font-size: 14px;
             font-weight: bold;
             text-align: center;
-        }
-
-        .info-box {
-            background: #e3f2fd;
-            color: #1565c0;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-            font-size: 12px;
-            line-height: 1.5;
-        }
-
-        .raw-data-container {
-            max-height: 150px;
-            overflow-y: auto;
-            background: #f4f4f4;
-            padding: 8px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 11px;
-            white-space: pre-wrap;
         }
 
         .error-message {
@@ -325,67 +394,62 @@
             font-size: 13px;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .chat-container {
-                width: 98%;
-                height: 95vh;
-            }
-            
-            .horizontal-table {
-                min-width: 900px;
-            }
-            
-            .horizontal-table thead th,
-            .horizontal-table tbody td {
-                padding: 6px 4px;
-                font-size: 10px;
-                min-width: 80px;
-            }
-
-            .message-content {
-                max-width: 98%;
-            }
+        .google-auth-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #ea4335 0%, #fbbc05 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            margin-left: 10px;
         }
 
-        .loading-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #666;
+        .google-auth-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(234, 67, 53, 0.4);
         }
 
-        .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid #ddd;
-            border-top: 2px solid #4facfe;
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h1>🧾 Bill Calculator Bot</h1>
-            <p>ระบบคำนวณและแปลงข้อมูลบิล</p>
+            <h1>🧾 Enhanced Bill Calculator Bot with Google Drive</h1>
+            <p>ระบบคำนวณและแปลงข้อมูลบิลพร้อม Google Drive Integration</p>
         </div>
         
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
                 <div class="message-content">
-                    <strong>🎯 ยินดีต้อนรับสู่ Bill Calculator!</strong><br><br>
+                    <strong>🎯 ยินดีต้อนรับสู่ Enhanced Bill Calculator!</strong><br><br>
+                    
+                    📋 <strong>ฟีเจอร์ใหม่:</strong><br>
+                    • 🔗 ดึงภาพจาก Google Drive โดยตรง<br>
+                    • ⚡ ประมวลผลแบบ Parallel Processing<br>
+                    • 📊 Real-time Progress Tracking<br><br>
                     
                     📋 <strong>วิธีใช้งาน:</strong><br>
-                    1. อัพโหลดรูปภาพบิล หรือ Ctrl+V วางรูปจากคลิปบอร์ด<br>
-                    2. กดปุ่ม "ประมวลผลด้วย MCP"<br>
-                    3. รอผลลัพธ์การแปลงและคำนวณ<br><br>
+                    1. กดปุ่ม "เข้าสู่ระบบ Google" เพื่ออนุญาตการเข้าถึง<br>
+                    2. ใส่ URL Google Drive Folder ที่แชร์แล้ว<br>
+                    3. กดปุ่ม "ดึงภาพจาก Drive"<br>
+                    4. หรืออัพโหลดรูปภาพบิลโดยตรง<br>
+                    5. กดปุ่ม "ประมวลผลแบบ Parallel"<br><br>
                     
                     💡 <strong>รองรับ:</strong> JPG, PNG, WebP
                 </div>
@@ -394,59 +458,281 @@
 
         <div class="chat-input-area">
             <div class="input-section">
-                <div class="file-upload-area">
-                    <div class="file-input-wrapper" id="fileInputWrapper">
-                        <label for="fileInput">📁 อัปโหลดภาพบิล</label>
-                        <input type="file" id="fileInput" class="file-input" accept="image/*" multiple>
-                        <span class="file-upload-icon">📄</span>
-                        <div class="file-upload-text">
-                            <strong>คลิก หรือ Ctrl+V</strong><br>
-                            JPG, PNG, WebP
-                        </div>
-                    </div>
-                    <div id="selectedFile" class="selected-file" style="display: none;"></div>
+                <!-- Google Drive Integration Section -->
+                <div class="google-sheets-section">
+                    <span style="font-weight: bold; color: #666; min-width: 100px;">📊 Google Drive:</span>
+                    <input 
+                        type="url" 
+                        id="googleDriveUrl" 
+                        class="sheets-input" 
+                        placeholder="https://drive.google.com/drive/folders/..."
+                        value=""
+                    >
+                    <button class="google-auth-btn" id="googleAuthBtn">
+                        🔐 เข้าสู่ระบบ Google
+                    </button>
+                    <button class="sheets-btn" id="fetchDriveBtn" disabled>
+                        📥 ดึงภาพจาก Drive
+                    </button>
                 </div>
-                <button class="process-btn" id="processBtn" disabled>
-                    ประมวลผลด้วย MCP
-                </button>
+
+                <!-- File Upload Section -->
+                <div class="file-upload-section">
+                    <div class="file-upload-area">
+                        <div class="file-input-wrapper" id="fileInputWrapper">
+                            <label for="fileInput">📁 อัปโหลดภาพบิล</label>
+                            <input type="file" id="fileInput" class="file-input" accept="image/*" multiple>
+                            <span class="file-upload-icon">📄</span>
+                            <div class="file-upload-text">
+                                <strong>คลิก หรือ Ctrl+V</strong><br>
+                                JPG, PNG, WebP (สูงสุด 100 ไฟล์)
+                            </div>
+                        </div>
+                        <div id="selectedFile" class="selected-file" style="display: none;"></div>
+                    </div>
+                    <button class="process-btn" id="processBtn" disabled>
+                        ประมวลผลแบบ Parallel
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Load Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    // index.html (ช่วงบน)
+    <script src="env.js"></script>
+<script>
+  const CLIENT_ID = window.ENV.GOOGLE_CLIENT_ID;
+  const API_KEY = window.ENV.GOOGLE_API_KEY;
+</script>
+
+
     <script>
-    const fileInput = document.getElementById("fileInput");
+// === Configuration ===
+const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+
+// === Global Variables ===
+let selectedImageFiles = [];
+let googleDriveUrl = "";
+let isSignedIn = false;
+
+// === DOM Elements ===
+const fileInput = document.getElementById("fileInput");
 const processBtn = document.getElementById("processBtn");
 const selectedFile = document.getElementById("selectedFile");
 const chatMessages = document.getElementById("chatMessages");
+const googleDriveUrlInput = document.getElementById("googleDriveUrl");
+const fetchDriveBtn = document.getElementById("fetchDriveBtn");
+const googleAuthBtn = document.getElementById("googleAuthBtn");
 
-let selectedImageFiles = [];
+// === Google API Initialization ===
+function initGoogleAPI() {
+    gapi.load('client:auth2', () => {
+        gapi.client.init({
+            apiKey: API_KEY,
+            clientId: CLIENT_ID,
+            discoveryDocs: DISCOVERY_DOCS,
+            scope: SCOPES
+        }).then(() => {
+            // Listen for sign-in state changes
+            gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+            
+            // Handle initial sign-in state
+            updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        }).catch(error => {
+            console.error('Error initializing Google API:', error);
+            showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ใน Google Cloud Console ก่อน', 'error');
+        });
+    });
+}
 
-// === Helper: ตั้งค่าหลังเลือกรูป/วางรูป ===
+// === Update Sign-in Status ===
+function updateSigninStatus(signedIn) {
+    isSignedIn = signedIn;
+    if (signedIn) {
+        googleAuthBtn.textContent = '✅ เชื่อมต่อ Google แล้ว';
+        googleAuthBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+        fetchDriveBtn.disabled = false;
+        showMessage('✅ เข้าสู่ระบบ Google สำเร็จ', 'success');
+    } else {
+        googleAuthBtn.textContent = '🔐 เข้าสู่ระบบ Google';
+        googleAuthBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #fbbc05 100%)';
+        fetchDriveBtn.disabled = true;
+    }
+}
+
+// === Google Sign-in ===
+googleAuthBtn.addEventListener('click', () => {
+    if (!isSignedIn) {
+        gapi.auth2.getAuthInstance().signIn();
+    } else {
+        // Optional: Sign out
+        if (confirm('ต้องการออกจากระบบ Google?')) {
+            gapi.auth2.getAuthInstance().signOut();
+        }
+    }
+});
+
+// === Fetch Images from Google Drive ===
+fetchDriveBtn.addEventListener('click', async () => {
+    const url = googleDriveUrlInput.value.trim();
+    
+    if (!url) {
+        showMessage('กรุณาใส่ URL Google Drive Folder', 'error');
+        return;
+    }
+    
+    if (!url.includes('drive.google.com/drive/folders/')) {
+        showMessage('กรุณาใส่ URL Google Drive Folder ที่ถูกต้อง', 'error');
+        return;
+    }
+    
+    // Extract folder ID from URL
+    const folderId = extractFolderId(url);
+    if (!folderId) {
+        showMessage('ไม่สามารถดึง Folder ID จาก URL ได้', 'error');
+        return;
+    }
+    
+    fetchDriveBtn.disabled = true;
+    fetchDriveBtn.innerHTML = '<span class="loading-spinner"></span> กำลังดึงภาพ...';
+    
+    try {
+        // List files in the folder
+        const response = await gapi.client.drive.files.list({
+            q: `'${folderId}' in parents and (mimeType contains 'image/')`,
+            fields: 'files(id, name, mimeType, webContentLink, size)',
+            pageSize: 100
+        });
+        
+        const files = response.result.files;
+        
+        if (!files || files.length === 0) {
+            showMessage('ไม่พบรูปภาพใน Folder นี้', 'error');
+            return;
+        }
+        
+        showMessage(`✅ พบรูปภาพ ${files.length} ไฟล์ กำลังโหลด...`, 'success');
+        
+        // Download images as blobs
+        const imagePromises = files.map(async (file) => {
+            try {
+                // Get file content
+                const resp = await gapi.client.drive.files.get({
+                    fileId: file.id,
+                    alt: 'media'
+                });
+                
+                // Convert to blob
+                const blob = new Blob([resp.body], { type: file.mimeType });
+                return new File([blob], file.name, { type: file.mimeType });
+            } catch (error) {
+                console.error(`Error downloading ${file.name}:`, error);
+                return null;
+            }
+        });
+        
+        const downloadedFiles = await Promise.all(imagePromises);
+        const validFiles = downloadedFiles.filter(f => f !== null);
+        
+        if (validFiles.length > 0) {
+            handleSelectedFiles(validFiles, 'drive');
+            showMessage(`✅ โหลดภาพจาก Google Drive สำเร็จ ${validFiles.length} ไฟล์`, 'success');
+        } else {
+            showMessage('ไม่สามารถโหลดรูปภาพได้', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error fetching from Drive:', error);
+        showMessage(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+    } finally {
+        fetchDriveBtn.disabled = false;
+        fetchDriveBtn.innerHTML = '📥 ดึงภาพจาก Drive';
+    }
+});
+
+// === Extract Folder ID from URL ===
+function extractFolderId(url) {
+    // Pattern 1: /folders/FOLDER_ID
+    const match1 = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+    if (match1) return match1[1];
+    
+    // Pattern 2: id=FOLDER_ID
+    const match2 = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+    if (match2) return match2[1];
+    
+    return null;
+}
+
+// === Alternative: Use Proxy Server (สำหรับ Public Folders) ===
+async function fetchFromPublicDrive(url) {
+    // สร้าง proxy server เพื่อดึงภาพจาก public folder
+    const proxyUrl = 'YOUR_PROXY_SERVER/fetch-drive';
+    
+    try {
+        const response = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderUrl: url })
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch from proxy');
+        
+        const data = await response.json();
+        
+        // Convert image URLs to Files
+        const filePromises = data.images.map(async (imgData) => {
+            const response = await fetch(imgData.url);
+            const blob = await response.blob();
+            return new File([blob], imgData.name, { type: blob.type });
+        });
+        
+        const files = await Promise.all(filePromises);
+        return files;
+        
+    } catch (error) {
+        console.error('Proxy fetch error:', error);
+        return [];
+    }
+}
+
+// === Helper: Set files after selection/paste ===
 function handleSelectedFiles(files, source = "เลือกไฟล์") {
+    const maxFiles = 100;
+    if (files.length > maxFiles) {
+        showMessage(`จำกัดการอัพโหลดสูงสุด ${maxFiles} ไฟล์`, "error");
+        files = files.slice(0, maxFiles);
+    }
+    
     selectedImageFiles = files;
     selectedFile.style.display = "block";
+    
     let fileListText = "";
     for (const file of files) {
         const kb = Math.round(file.size / 1024);
-        const label = source === "paste" ? "📋 วางรูป" : "📷 เลือก";
-        fileListText += `${label}: ${file.name} (${kb} KB)\n`;
+        const icon = source === "paste" ? "📋" : source === "drive" ? "☁️" : "📷";
+        fileListText += `${icon} ${file.name} (${kb} KB)\n`;
     }
+    
     selectedFile.textContent = fileListText.trim();
     processBtn.disabled = selectedImageFiles.length === 0;
+    processBtn.textContent = `ประมวลผล ${selectedImageFiles.length} ไฟล์แบบ Parallel`;
 }
 
-// === เลือกไฟล์ผ่าน input ===
+// === File Input Handler ===
 fileInput.addEventListener("change", (event) => {
     const files = Array.from(event.target.files).filter(f => f.type.startsWith("image/"));
     if (files.length > 0) {
         handleSelectedFiles(files, "input");
     } else {
-        alert("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
+        showMessage("กรุณาเลือกไฟล์รูปภาพเท่านั้น", "error");
         processBtn.disabled = true;
     }
 });
 
-// === รองรับ Ctrl+V (Paste รูปจากคลิปบอร์ด) ===
+// === Clipboard Paste Handler ===
 document.addEventListener("paste", async (e) => {
     const dt = e.clipboardData || window.clipboardData;
     if (!dt) return;
@@ -470,57 +756,64 @@ document.addEventListener("paste", async (e) => {
     }
 });
 
-// === เมื่อกดปุ่มประมวลผล ===
+// === Process Files ===
 processBtn.addEventListener("click", async () => {
     if (selectedImageFiles.length === 0) return;
 
     processBtn.disabled = true;
     processBtn.textContent = "กำลังประมวลผล...";
 
-    const startTimeAll = Date.now();
-    const startDateAll = new Date(startTimeAll).toLocaleString("th-TH");
-
-    for (const file of selectedImageFiles) {
-        await processSingleFile(file);
+    const startTime = Date.now();
+    
+    // Create processing status
+    const statusDiv = createProcessingStatus(selectedImageFiles.length);
+    
+    // Process files in chunks (max 10 concurrent)
+    const maxConcurrent = 10;
+    const chunks = [];
+    for (let i = 0; i < selectedImageFiles.length; i += maxConcurrent) {
+        chunks.push(selectedImageFiles.slice(i, i + maxConcurrent));
     }
 
-    const endTimeAll = Date.now();
-    const endDateAll = new Date(endTimeAll).toLocaleString("th-TH");
-    const durationAllSec = ((endTimeAll - startTimeAll) / 1000).toFixed(2);
-    const durationAllMin = (durationAllSec / 60).toFixed(2);
+    let processedCount = 0;
+    const results = [];
 
-    createTotalSummaryMessage({
-        fileCount: selectedImageFiles.length,
-        startDateAll,
-        endDateAll,
-        durationAllSec,
-        durationAllMin
-    });
+    for (const chunk of chunks) {
+        const chunkPromises = chunk.map(file => processSingleFile(file, statusDiv));
+        const chunkResults = await Promise.allSettled(chunkPromises);
+        
+        chunkResults.forEach((result, index) => {
+            processedCount++;
+            updateProgress(statusDiv, processedCount, selectedImageFiles.length);
+            
+            if (result.status === 'fulfilled') {
+                results.push(result.value);
+            }
+        });
+    }
 
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+    // Show summary
+    createSummaryMessage(results, duration);
+    
+    // Hide processing status
+    statusDiv.style.display = 'none';
+    
     processBtn.disabled = false;
-    processBtn.textContent = "ประมวลผลด้วย MCP";
+    processBtn.textContent = "ประมวลผลแบบ Parallel";
 });
 
-// === ฟังก์ชันประมวลผลไฟล์เดียว ===
-async function processSingleFile(file) {
+// === Process Single File ===
+async function processSingleFile(file, statusDiv) {
     const startTime = Date.now();
-    const startDateStr = new Date(startTime).toLocaleString("th-TH");
+    const taskId = `task_${file.name}_${Date.now()}`;
+    
+    updateTaskStatus(statusDiv, taskId, file.name, 'processing');
 
     const formData = new FormData();
     formData.append("file", file);
-
-    const loadingDiv = document.createElement("div");
-    loadingDiv.className = "message bot";
-    loadingDiv.id = `processingMessage_${file.name}`;
-    loadingDiv.innerHTML = `
-        <div class="message-content">
-            <div class="loading-container">
-                <div class="spinner"></div>
-                ⏳ กำลังประมวลผลไฟล์: <strong>${escapeHtml(file.name)}</strong>
-            </div>
-        </div>`;
-    chatMessages.appendChild(loadingDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
 
     try {
         const res = await fetch("https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1", {
@@ -537,213 +830,238 @@ async function processSingleFile(file) {
             try { data = JSON.parse(txt); } catch { data = txt; }
         }
 
-        document.getElementById(`processingMessage_${file.name}`)?.remove();
-
         const payload = Array.isArray(data) ? data[0] : data;
         if (!payload || typeof payload !== "object") {
             throw new Error("รูปแบบข้อมูลตอบกลับไม่ถูกต้อง");
         }
 
-        const endTime = Date.now();
-        const endDateStr = new Date(endTime).toLocaleString("th-TH");
-        const durationSec = ((endTime - startTime) / 1000).toFixed(2);
+        updateTaskStatus(statusDiv, taskId, file.name, 'completed');
+        
+        createResultMessage(file.name, payload, {
+            startTime: new Date(startTime).toLocaleString("th-TH"),
+            endTime: new Date().toLocaleString("th-TH"),
+            duration: ((Date.now() - startTime) / 1000).toFixed(2)
+        });
 
-        createResultMessage(file.name, payload, { startDateStr, endDateStr, durationSec });
+        return { success: true, fileName: file.name, data: payload };
 
     } catch (error) {
-        document.getElementById(`processingMessage_${file.name}`)?.remove();
-        const errorDiv = document.createElement("div");
-        errorDiv.className = "message bot";
-        errorDiv.innerHTML = `
-            <div class="message-content">
-                <div class="error-message">
-                    ❌ เกิดข้อผิดพลาดในการประมวลผลไฟล์ <strong>${escapeHtml(file.name)}</strong><br>
-                    <small>${escapeHtml(error.message || String(error))}</small>
-                </div>
-            </div>`;
-        chatMessages.appendChild(errorDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        updateTaskStatus(statusDiv, taskId, file.name, 'error');
+        showMessage(`❌ เกิดข้อผิดพลาดในการประมวลผล ${file.name}: ${error.message}`, 'error');
+        return { success: false, fileName: file.name, error: error.message };
     }
 }
 
-// === ฟังก์ชันสร้างผลลัพธ์ต่อไฟล์ (ปรับปรุงใหม่) ===
-function createResultMessage(fileName, payload, timeInfo = null) {
+// === Create Processing Status ===
+function createProcessingStatus(totalFiles) {
+    const statusDiv = document.createElement("div");
+    statusDiv.className = "message bot";
+    statusDiv.innerHTML = `
+        <div class="message-content">
+            <div class="processing-status">
+                <h4>🔄 กำลังประมวลผลแบบ Parallel</h4>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div id="progressText">0 / ${totalFiles} ไฟล์</div>
+                <div class="task-list" id="taskList"></div>
+            </div>
+        </div>`;
+    
+    chatMessages.appendChild(statusDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    return statusDiv;
+}
+
+// === Update Progress ===
+function updateProgress(statusDiv, processed, total) {
+    const progressFill = statusDiv.querySelector('#progressFill');
+    const progressText = statusDiv.querySelector('#progressText');
+    
+    const percentage = Math.round((processed / total) * 100);
+    progressFill.style.width = `${percentage}%`;
+    progressText.textContent = `${processed} / ${total} ไฟล์ (${percentage}%)`;
+}
+
+// === Update Task Status ===
+function updateTaskStatus(statusDiv, taskId, fileName, status) {
+    const taskList = statusDiv.querySelector('#taskList');
+    let taskItem = taskList.querySelector(`[data-task-id="${taskId}"]`);
+    
+    if (!taskItem) {
+        taskItem = document.createElement('div');
+        taskItem.className = 'task-item';
+        taskItem.setAttribute('data-task-id', taskId);
+        taskList.appendChild(taskItem);
+    }
+    
+    taskItem.className = `task-item ${status}`;
+    
+    const icons = {
+        processing: '⏳',
+        completed: '✅',
+        error: '❌'
+    };
+    
+    const statusTexts = {
+        processing: 'กำลังประมวลผล...',
+        completed: 'สำเร็จ',
+        error: 'เกิดข้อผิดพลาด'
+    };
+    
+    taskItem.innerHTML = `
+        ${icons[status]} 
+        <span style="font-weight: bold;">${escapeHtml(fileName.substring(0, 15))}</span>
+        <span style="color: #666; font-size: 11px;">${statusTexts[status]}</span>
+    `;
+}
+
+// === Create Result Message ===
+function createResultMessage(fileName, payload, timeInfo) {
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message bot";
+    
     let resultHTML = `
         <div class="message-content">
             <div class="results-container">
                 <div class="summary-card">
                     <h3>📊 ผลลัพธ์จากไฟล์: ${escapeHtml(fileName)}</h3>
+                    ${timeInfo ? `
+                        <div style="font-size: 12px;">
+                            ⏱ ใช้เวลา: ${timeInfo.duration} วินาที
+                        </div>
+                    ` : ''}
                 </div>`;
-
-    if (timeInfo) {
-        resultHTML += `
-            <div style="margin:6px 0; font-size:12px; text-align:left;">
-                🟢 เริ่ม: ${escapeHtml(timeInfo.startDateStr)}<br>
-                🔴 จบ: ${escapeHtml(timeInfo.endDateStr)}<br>
-                ⏱ ใช้เวลา: ${escapeHtml(timeInfo.durationSec)} วินาที
-            </div>`;
-    }
-
-    // === แสดงข้อมูลแบบตารางแนวนอน ===
+    
+    // Add data table
     resultHTML += createHorizontalDataTable(payload);
-
-    // === ปุ่ม Export ===
+    
+    // Add export buttons
     resultHTML += `
-        <button class="process-btn" style="margin:10px 5px;" onclick='exportToCSV(${JSON.stringify(payload)})'>
-            📊 Export CSV
-        </button>
-        <button class="process-btn" style="margin:10px 5px;" onclick='exportToJSON(${JSON.stringify(payload)})'>
-            📄 Export JSON
-        </button>`;
-
-    // === Raw Data ===
-    resultHTML += `
-        <div class="info-box">
-            <strong>📝 Raw Data:</strong>
-            <details><summary>แสดง/ซ่อน JSON</summary>
-            <div class="raw-data-container">${escapeHtml(JSON.stringify(payload, null, 2))}</div>
-            </details>
+        <div style="margin: 10px 0;">
+            <button class="process-btn" style="margin: 5px; padding: 8px 15px;" 
+                onclick='exportToCSV(${JSON.stringify(payload)}, "${escapeHtml(fileName)}")'>
+                📊 Export CSV
+            </button>
+            <button class="process-btn" style="margin: 5px; padding: 8px 15px;"
+                onclick='exportToJSON(${JSON.stringify(payload)}, "${escapeHtml(fileName)}")'>
+                📄 Export JSON
+            </button>
         </div>
     </div></div>`;
-
-    const msgDiv = document.createElement("div");
-    msgDiv.className = "message bot";
+    
     msgDiv.innerHTML = resultHTML;
-
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// === สร้างตารางแนวนอนจากข้อมูล ===
+// === Create Horizontal Data Table ===
 function createHorizontalDataTable(data) {
     if (!data || typeof data !== 'object') return '';
     
-    let html = '';
+    let html = '<div class="horizontal-table-container"><table class="horizontal-table">';
     
-    // แยกข้อมูลออกเป็นหมวดหมู่
-    const sections = categorizeData(data);
+    // Create headers and values arrays
+    const entries = Object.entries(data);
     
-    // แสดงแต่ละหมวด
-    for (const [sectionName, sectionData] of Object.entries(sections)) {
-        if (Array.isArray(sectionData) && sectionData.length > 0) {
-            // สำหรับข้อมูลแบบ Array (เช่น Item List)
-            html += createArrayTable(sectionName, sectionData);
-        } else if (typeof sectionData === 'object' && Object.keys(sectionData).length > 0) {
-            // สำหรับข้อมูลแบบ Object
-            html += createObjectTable(sectionName, sectionData);
+    // Headers row
+    html += '<thead><tr>';
+    entries.forEach(([key]) => {
+        html += `<th>${escapeHtml(key)}</th>`;
+    });
+    html += '</tr></thead>';
+    
+    // Values row
+    html += '<tbody><tr>';
+    entries.forEach(([, value]) => {
+        let displayValue = value;
+        if (typeof value === 'object') {
+            displayValue = JSON.stringify(value, null, 2);
         }
+        html += `<td title="${escapeHtml(String(displayValue))}">${escapeHtml(String(displayValue))}</td>`;
+    });
+    html += '</tr></tbody>';
+    
+    html += '</table></div>';
+    return html;
+}
+
+// === Create Summary Message ===
+function createSummaryMessage(results, duration) {
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.filter(r => !r.success).length;
+    
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message bot";
+    msgDiv.innerHTML = `
+        <div class="message-content">
+            <div class="summary-card" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
+                <h3>📊 สรุปผลการประมวลผล</h3>
+                <div>จำนวนไฟล์ทั้งหมด: ${results.length}</div>
+                <div>✅ สำเร็จ: ${successCount} ไฟล์</div>
+                <div>❌ ล้มเหลว: ${errorCount} ไฟล์</div>
+                <div>⏱ เวลาทั้งหมด: ${duration} วินาที</div>
+                <div>⚡ ความเร็วเฉลี่ย: ${(results.length / parseFloat(duration)).toFixed(2)} ไฟล์/วินาที</div>
+            </div>
+        </div>`;
+    
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// === Show Message ===
+function showMessage(message, type = "info") {
+    const colors = {
+        success: "#4caf50",
+        error: "#f44336",
+        info: "#2196f3"
+    };
+    
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message bot";
+    msgDiv.innerHTML = `
+        <div class="message-content">
+            <div style="background: ${colors[type]}20; color: ${colors[type]}; 
+                padding: 12px; border-radius: 8px; border-left: 4px solid ${colors[type]}; 
+                margin: 10px 0; font-size: 13px;">
+                ${escapeHtml(message)}
+            </div>
+        </div>`;
+    
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Auto remove after 5 seconds for non-error messages
+    if (type !== 'error') {
+        setTimeout(() => {
+            if (msgDiv.parentNode) {
+                msgDiv.remove();
+            }
+        }, 5000);
     }
-    
-    return html;
-}
-
-// === แยกข้อมูลออกเป็นหมวดหมู่ ===
-function categorizeData(data) {
-    const sections = {};
-    
-    // จัดหมวดข้อมูล
-    for (const [key, value] of Object.entries(data)) {
-        if (Array.isArray(value)) {
-            sections[key] = value;
-        } else if (typeof value === 'object' && value !== null) {
-            sections[key] = value;
-        } else {
-            // ข้อมูลทั่วไป
-            if (!sections['ข้อมูลทั่วไป']) sections['ข้อมูลทั่วไป'] = {};
-            sections['ข้อมูลทั่วไป'][key] = value;
-        }
-    }
-    
-    return sections;
-}
-
-// === สร้างตารางสำหรับข้อมูลแบบ Array ===
-function createArrayTable(title, arrayData) {
-    if (!arrayData || arrayData.length === 0) return '';
-    
-    const headers = Object.keys(arrayData[0]);
-    let html = `
-        <div class="section-title">📦 ${escapeHtml(title)}</div>
-        <div class="horizontal-table-container">
-            <table class="horizontal-table">
-                <thead>
-                    <tr>`;
-    
-    headers.forEach(header => {
-        html += `<th>${escapeHtml(header)}</th>`;
-    });
-    
-    html += `</tr></thead><tbody>`;
-    
-    arrayData.forEach(item => {
-        html += `<tr>`;
-        headers.forEach(header => {
-            const value = item[header] ?? '';
-            html += `<td title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</td>`;
-        });
-        html += `</tr>`;
-    });
-    
-    html += `</tbody></table></div>`;
-    return html;
-}
-
-// === สร้างตารางแนวนอนสำหรับข้อมูลแบบ Object ===
-function createObjectTable(title, objectData) {
-    if (!objectData || Object.keys(objectData).length === 0) return '';
-    
-    const entries = Object.entries(objectData);
-    const headers = entries.map(([key]) => key);
-    const values = entries.map(([, value]) => {
-        if (typeof value === 'object' && value !== null) {
-            return JSON.stringify(value);
-        }
-        return String(value ?? '');
-    });
-    
-    let html = `
-        <div class="section-title">📋 ${escapeHtml(title)}</div>
-        <div class="horizontal-table-container">
-            <table class="horizontal-table">
-                <thead>
-                    <tr>`;
-    
-    // สร้าง header แนวนอน
-    headers.forEach(header => {
-        html += `<th>${escapeHtml(header)}</th>`;
-    });
-    
-    html += `</tr></thead><tbody><tr>`;
-    
-    // สร้าง row ข้อมูล
-    values.forEach(value => {
-        html += `<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`;
-    });
-    
-    html += `</tr></tbody></table></div>`;
-    return html;
 }
 
 // === Export Functions ===
-function exportToCSV(data) {
+function exportToCSV(data, fileName) {
     try {
         const csvData = flattenObjectForCSV(data);
         const headers = Object.keys(csvData);
         const values = headers.map(h => `"${String(csvData[h] ?? "").replace(/"/g, '""')}"`);
         
         const csvContent = [headers.join(","), values.join(",")].join("\n");
-        downloadFile(csvContent, "text/csv", "invoice_data.csv");
+        downloadFile(csvContent, "text/csv", `${fileName.replace(/\.[^/.]+$/, "")}_data.csv`);
     } catch (error) {
-        alert("เกิดข้อผิดพลาดในการ Export CSV");
+        showMessage("เกิดข้อผิดพลาดในการ Export CSV", "error");
     }
 }
 
-function exportToJSON(data) {
+function exportToJSON(data, fileName) {
     try {
         const jsonContent = JSON.stringify(data, null, 2);
-        downloadFile(jsonContent, "application/json", "invoice_data.json");
+        downloadFile(jsonContent, "application/json", `${fileName.replace(/\.[^/.]+$/, "")}_data.json`);
     } catch (error) {
-        alert("เกิดข้อผิดพลาดในการ Export JSON");
+        showMessage("เกิดข้อผิดพลาดในการ Export JSON", "error");
     }
 }
 
@@ -775,38 +1093,31 @@ function downloadFile(content, mimeType, fileName) {
     document.body.removeChild(link);
 }
 
-// ===== Helper Functions =====
+// === Utility: Escape HTML ===
 function escapeHtml(str) {
     return String(str)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
-function createTotalSummaryMessage(info) {
-    const resultHTML = `
-        <div class="message-content">
-            <div class="summary-card" style="background: linear-gradient(135deg,#ff512f 0%,#dd2476 100%);">
-                <h3>📊 สรุปผลรวมทั้งหมด</h3>
-                <div>✅ จำนวนไฟล์ที่ประมวลผล: ${info.fileCount} ไฟล์</div>
-                <div style="margin-top:8px; font-size:13px; text-align:left;">
-                    🟢 เริ่มทั้งหมด: ${escapeHtml(info.startDateAll)}<br>
-                    🔴 จบทั้งหมด: ${escapeHtml(info.endDateAll)}<br>
-                    ⏱ ใช้เวลา: ${escapeHtml(info.durationAllSec)} วินาที (~${escapeHtml(info.durationAllMin)} นาที)
-                </div>
-            </div>
-        </div>`;
-
-    const msgDiv = document.createElement("div");
-    msgDiv.className = "message bot";
-    msgDiv.innerHTML = resultHTML;
-
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+// === Initialize Google API on Load ===
+function isInvalidConfig() {
+    return (
+        !CLIENT_ID || CLIENT_ID.includes("default") ||
+        !API_KEY || API_KEY.length < 20
+    );
 }
 
-    </script>
-</body>
-</html>
+window.onload = function () {
+    if (isInvalidConfig()) {
+        showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ให้ถูกต้องก่อนใช้งาน', 'error');
+        googleAuthBtn.disabled = true;
+        fetchDriveBtn.disabled = true;
+        googleAuthBtn.textContent = '⚠️ ตั้งค่า API ก่อน';
+    } else {
+        initGoogleAPI();
+    }
+};
