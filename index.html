@@ -547,32 +547,76 @@
         let gapiReady = false;
         googleAuthBtn.disabled = true;
 
+        // === Ensure / Create Auth Instance (defensive) ===
+        async function ensureAuthInstance() {
+            try {
+                // If auth2 and instance exists, return it
+                if (window.gapi && gapi.auth2 && typeof gapi.auth2.getAuthInstance === 'function') {
+                    const inst = gapi.auth2.getAuthInstance();
+                    if (inst) return inst;
+                }
+    
+                // Try to initialize auth2 directly (defensive)
+                if (window.gapi && gapi.auth2 && typeof gapi.auth2.init === 'function') {
+                    return await gapi.auth2.init({ client_id: CLIENT_ID, scope: SCOPES });
+                }
+    
+                // Try loading auth2 library and init
+                if (window.gapi && typeof gapi.load === 'function') {
+                    await new Promise((resolve, reject) => {
+                        try {
+                            gapi.load('auth2', { callback: resolve, onerror: reject });
+                        } catch (e) { reject(e); }
+                    });
+                    if (gapi.auth2 && typeof gapi.auth2.init === 'function') {
+                        return await gapi.auth2.init({ client_id: CLIENT_ID, scope: SCOPES });
+                    }
+                }
+            } catch (err) {
+                console.error('ensureAuthInstance error', err);
+                return null;
+            }
+            return null;
+        }
+
         // === Google API Initialization ===
         function initGoogleAPI() {
-            gapi.load('client:auth2', () => {
-                gapi.client.init({
-                    apiKey: API_KEY,
-                    clientId: CLIENT_ID,
-                    discoveryDocs: DISCOVERY_DOCS,
-                    scope: SCOPES
-                }).then(() => {
-                    // enable auth button only after init success
+            if (!window.gapi || typeof gapi.load !== 'function') {
+                console.error('gapi not loaded');
+                showMessage('⚠️ Google API loader ไม่ถูกโหลด (ตรวจสอบ https://apis.google.com/js/api.js)', 'error');
+                return;
+            }
+            gapi.load('client:auth2', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        clientId: CLIENT_ID,
+                        discoveryDocs: DISCOVERY_DOCS,
+                        scope: SCOPES
+                    });
+    
+                    // try to ensure auth instance
+                    const authInstance = await ensureAuthInstance();
+                    if (!authInstance) {
+                        console.warn('gapi.auth2 instance unavailable after init');
+                        showMessage('⚠️ ไม่พบ Google auth instance — อาจต้องใช้ Google Identity Services หรือตรวจสอบเวอร์ชัน gapi', 'error');
+                        gapiReady = false;
+                        googleAuthBtn.disabled = true;
+                        return;
+                    }
+    
+                    // enable button and listen for state
                     gapiReady = true;
                     googleAuthBtn.disabled = !CLIENT_ID || !API_KEY;
-                    
-                     // Listen for sign-in state changes
-                     gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
-                     
-                     // Handle initial sign-in state
-                     updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-                 }).catch(error => {
-                     console.error('Error initializing Google API:', error);
-                     showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ใน Google Cloud Console ก่อน', 'error');
-                     // keep auth button disabled on error
-                     gapiReady = false;
-                     googleAuthBtn.disabled = true;
-                 });
-             });
+                    authInstance.isSignedIn.listen(updateSigninStatus);
+                    updateSigninStatus(authInstance.isSignedIn.get());
+                } catch (error) {
+                    console.error('Error initializing Google API:', error);
+                    showMessage('⚠️ Error initializing Google API — ตรวจสอบ CLIENT_ID / API_KEY และ Authorized origins', 'error');
+                    gapiReady = false;
+                    googleAuthBtn.disabled = true;
+                }
+            });
         }
 
         // === Update Sign-in Status ===
@@ -592,30 +636,30 @@
 
         // === Google Sign-in ===
         googleAuthBtn.addEventListener('click', async () => {
-            if (!gapiReady || !window.gapi || !gapi.auth2 || !gapi.auth2.getAuthInstance) {
-                showMessage('⚠️ Google API ยังไม่พร้อม กรุณารอสักครู่', 'error');
-                console.error('gapi not ready', window.gapi);
+            if (googleAuthBtn.disabled) {
+                showMessage('⚠️ ปุ่มยังไม่พร้อม — รอสักครู่หรือดู console สำหรับรายละเอียด', 'error');
                 return;
             }
 
-            const authInstance = gapi.auth2.getAuthInstance();
+            // get or initialize auth instance on demand
+            const authInstance = await ensureAuthInstance();
             if (!authInstance) {
-                showMessage('⚠️ ไม่สามารถเข้าถึง Google auth instance ได้', 'error');
-                console.error('authInstance missing', gapi);
+                showMessage('⚠️ ไม่สามารถสร้าง/เข้าถึง Google auth instance ได้ — ดู console', 'error');
+                console.error('authInstance missing after ensureAuthInstance', window.gapi);
                 return;
             }
 
-            if (!isSignedIn) {
-                try {
+            try {
+                if (!isSignedIn) {
                     await authInstance.signIn();
-                } catch (err) {
-                    console.error('signIn failed', err);
-                    showMessage('❌ เข้าสู่ระบบไม่สำเร็จ', 'error');
+                } else {
+                    if (confirm('ต้องการออกจากระบบ Google?')) {
+                        await authInstance.signOut();
+                    }
                 }
-            } else {
-                if (confirm('ต้องการออกจากระบบ Google?')) {
-                    try { await authInstance.signOut(); } catch (err) { console.error('signOut failed', err); }
-                }
+            } catch (err) {
+                console.error('signIn/signOut error', err);
+                showMessage('❌ เข้าสู่ระบบไม่สำเร็จ (ดู console)', 'error');
             }
         });
 
