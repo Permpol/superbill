@@ -696,13 +696,11 @@
             const startTime = Date.now();
             const taskId = `task_${file.name.replace(/\s+/g,'_')}_${Date.now()}`;
 
-            // If statusDiv provided, mark task as processing
             if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'processing');
 
             const formData = new FormData();
             formData.append('file', file);
 
-            // Show loading in results area as fallback (keeps old behavior)
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'result-card';
             loadingDiv.id = `loading_${taskId}`;
@@ -714,7 +712,6 @@
             resultsContainer.appendChild(loadingDiv);
 
             try {
-                // Normalize endpoint (support CONFIG.API_ENDPOINT if set)
                 const apiBase = (CONFIG && CONFIG.API_ENDPOINT) ? String(CONFIG.API_ENDPOINT).replace(/\/+$/g, '') : '';
                 const endpoint = apiBase ? `${apiBase}/webhook/aip1` : 'https://allie-capacitive-kaiden.ngrok-free.app/webhook-test/aip1';
 
@@ -723,13 +720,25 @@
                     body: formData
                 });
 
-                const ct = res.headers.get('content-type') || '';
+                // always read text first to avoid res.json() throwing on empty body
+                const txt = await res.text();
+
+                if (!res.ok) {
+                    const snippet = txt ? ` Response body: ${txt.slice(0,200)}` : '';
+                    throw new Error(`HTTP ${res.status} ${res.statusText}${snippet}`);
+                }
+
+                if (!txt || txt.trim() === '') {
+                    throw new Error('Empty response body from server');
+                }
+
                 let data;
-                if (ct.includes('application/json')) {
-                    data = await res.json();
-                } else {
-                    const txt = await res.text();
-                    try { data = JSON.parse(txt); } catch { data = txt; }
+                try {
+                    data = JSON.parse(txt);
+                } catch (e) {
+                    // include small snippet to help debugging (no secrets)
+                    const preview = txt.length > 300 ? txt.slice(0,300) + '...' : txt;
+                    throw new Error(`Invalid JSON response: ${preview}`);
                 }
 
                 document.getElementById(`loading_${taskId}`)?.remove();
@@ -739,10 +748,8 @@
                     throw new Error('รูปแบบข้อมูลตอบกลับไม่ถูกต้อง');
                 }
 
-                // Update task status UI
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
 
-                // Show result card
                 createResultMessage(file.name, payload, {
                     startDateStr: new Date(startTime).toLocaleString('th-TH'),
                     endDateStr: new Date().toLocaleString('th-TH'),
@@ -754,15 +761,19 @@
             } catch (error) {
                 document.getElementById(`loading_${taskId}`)?.remove();
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'error');
+
+                const errMsg = error?.message || String(error);
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'result-card';
                 errorDiv.innerHTML = `
                     <div class="status error">
                         ❌ เกิดข้อผิดพลาดในการประมวลผลไฟล์ <strong>${escapeHtml(file.name)}</strong><br>
-                        <small>${escapeHtml(error.message || String(error))}</small>
+                        <small>${escapeHtml(errMsg)}</small>
                     </div>`;
                 resultsContainer.appendChild(errorDiv);
-                return { success: false, fileName: file.name, error: error.message || String(error) };
+
+                console.error('processSingleFile error:', error);
+                return { success: false, fileName: file.name, error: errMsg };
             }
         }
 
