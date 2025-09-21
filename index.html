@@ -401,9 +401,14 @@
                             alt: 'media'
                         });
                         
-                        // Convert response to blob
-                        const arrayBuffer = new TextEncoder().encode(resp.body);
-                        const blob = new Blob([arrayBuffer], { type: file.mimeType });
+                        // CORRECTED: Convert raw string response to Blob
+                        const byteCharacters = atob(btoa(resp.body)); // Re-encode to handle binary data correctly
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: file.mimeType });
                         
                         if (blob.size === 0) {
                             log(`❌ File ${file.name} has zero size`, 'error');
