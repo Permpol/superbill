@@ -513,6 +513,20 @@
                 const externalConfig = (await import('./env.js')).default;
                 CONFIG = { ...CONFIG, ...externalConfig };
                 log('Successfully loaded and merged env.js');
+
+                // mask secret for safe display (do NOT print full secret)
+                function maskSecret(s) {
+                    if (!s) return '(missing)';
+                    if (s.length <= 8) return '****';
+                    return s.slice(0,4) + '...' + s.slice(-4);
+                }
+                const maskedClientId = maskSecret(CONFIG.CLIENT_ID);
+                const maskedApiKey = maskSecret(CONFIG.API_KEY);
+                log(`Secrets loaded (masked): CLIENT_ID=${maskedClientId}, API_KEY=${maskedApiKey}`, 'info');
+                console.info('DEBUG: secrets presence:',
+                    { clientIdPresent: !!CONFIG.CLIENT_ID, apiKeyPresent: !!CONFIG.API_KEY });
+                // show in-page status for quick visual check
+                setStatus(configStatus, `✅ Config loaded (CLIENT_ID=${maskedClientId})`, 'success');
             } catch (e) {
                 log('env.js not found, using embedded OAuth configuration', 'info');
             }
