@@ -642,18 +642,28 @@
             const startTimeAll = Date.now();
             const startDateAll = new Date(startTimeAll).toLocaleString('th-TH');
 
-            // Process files in parallel with a limit of 3 concurrent requests
-            const CONCURRENT_LIMIT = 3;
+            // Create processing status UI (shows progress & per-task status)
+            const statusDiv = createProcessingStatus(selectedFiles.length);
+
+            // Process files in chunks (limit concurrency)
+            const CONCURRENT_LIMIT = 10; // adjust as needed
             const chunks = [];
-            
-            // Split files into chunks of CONCURRENT_LIMIT size
             for (let i = 0; i < selectedFiles.length; i += CONCURRENT_LIMIT) {
                 chunks.push(selectedFiles.slice(i, i + CONCURRENT_LIMIT));
             }
-            
-            // Process each chunk in parallel
+
+            let processedCount = 0;
+            const results = [];
+
             for (const chunk of chunks) {
-                await Promise.all(chunk.map(file => processSingleFile(file)));
+                const promises = chunk.map(file => processSingleFile(file, statusDiv));
+                const settled = await Promise.allSettled(promises);
+
+                settled.forEach(s => {
+                    processedCount++;
+                    updateProgress(statusDiv, processedCount, selectedFiles.length);
+                    if (s.status === 'fulfilled') results.push(s.value);
+                });
             }
 
             const endTimeAll = Date.now();
@@ -669,6 +679,9 @@
                 durationAllMin
             });
 
+            // hide status after short delay
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
+
             processBtn.disabled = false;
             processBtn.textContent = '⚡ ประมวลผลด้วย MCP';
             
@@ -678,20 +691,21 @@
         });
 
         // === Process Single File ===
-        async function processSingleFile(file) {
+        // now accepts optional statusDiv to update per-task UI
+        async function processSingleFile(file, statusDiv = null) {
             const startTime = Date.now();
-            const startDateStr = new Date(startTime).toLocaleString('th-TH');
+            const taskId = `task_${file.name.replace(/\s+/g,'_')}_${Date.now()}`;
+
+            // If statusDiv provided, mark task as processing
+            if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'processing');
 
             const formData = new FormData();
             formData.append('file', file);
 
-            // Generate unique ID for this task
-           const taskId = `task_${file.name}_${Date.now()}`;
-
-            // Show loading
+            // Show loading in results area as fallback (keeps old behavior)
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'result-card';
-           loadingDiv.id = taskId;
+            loadingDiv.id = `loading_${taskId}`;
             loadingDiv.innerHTML = `
                 <div class="loading-container">
                     <div class="spinner"></div>
@@ -700,27 +714,46 @@
             resultsContainer.appendChild(loadingDiv);
 
             try {
-                const res = await fetch('https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1', {
+                // Normalize endpoint (support CONFIG.API_ENDPOINT if set)
+                const apiBase = (CONFIG && CONFIG.API_ENDPOINT) ? String(CONFIG.API_ENDPOINT).replace(/\/+$/g, '') : '';
+                const endpoint = apiBase ? `${apiBase}/webhook/aip1` : 'https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1';
+
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     body: formData
                 });
 
-                const data = await res.json();
-               document.getElementById(taskId)?.remove();
+                const ct = res.headers.get('content-type') || '';
+                let data;
+                if (ct.includes('application/json')) {
+                    data = await res.json();
+                } else {
+                    const txt = await res.text();
+                    try { data = JSON.parse(txt); } catch { data = txt; }
+                }
+
+                document.getElementById(`loading_${taskId}`)?.remove();
 
                 const payload = Array.isArray(data) ? data[0] : data;
                 if (!payload || typeof payload !== 'object') {
                     throw new Error('รูปแบบข้อมูลตอบกลับไม่ถูกต้อง');
                 }
 
-                const endTime = Date.now();
-                const endDateStr = new Date(endTime).toLocaleString('th-TH');
-                const durationSec = ((endTime - startTime) / 1000).toFixed(2);
+                // Update task status UI
+                if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
 
-                createResultMessage(file.name, payload, { startDateStr, endDateStr, durationSec });
+                // Show result card
+                createResultMessage(file.name, payload, {
+                    startDateStr: new Date(startTime).toLocaleString('th-TH'),
+                    endDateStr: new Date().toLocaleString('th-TH'),
+                    durationSec: ((Date.now() - startTime) / 1000).toFixed(2)
+                });
+
+                return { success: true, fileName: file.name, data: payload };
 
             } catch (error) {
-               document.getElementById(taskId)?.remove();
+                document.getElementById(`loading_${taskId}`)?.remove();
+                if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'error');
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'result-card';
                 errorDiv.innerHTML = `
@@ -729,176 +762,54 @@
                         <small>${escapeHtml(error.message || String(error))}</small>
                     </div>`;
                 resultsContainer.appendChild(errorDiv);
+                return { success: false, fileName: file.name, error: error.message || String(error) };
             }
         }
 
-        // === Create Result Message ===
-        function createResultMessage(fileName, payload, timeInfo = null) {
-            const resultDiv = document.createElement('div');
-            resultDiv.className = 'result-card';
-            
-            let html = `
-                <div class="summary-card">
-                    <h3>📊 ผลลัพธ์จากไฟล์: ${escapeHtml(fileName)}</h3>
-                </div>`;
-
-            if (timeInfo) {
-                html += `
-                    <div style="margin:6px 0; font-size:12px;">
-                        🟢 เริ่ม: ${escapeHtml(timeInfo.startDateStr)}<br>
-                        🔴 จบ: ${escapeHtml(timeInfo.endDateStr)}<br>
-                        ⏱ ใช้เวลา: ${escapeHtml(timeInfo.durationSec)} วินาที
-                    </div>`;
-            }
-
-            // Display data in table format
-            html += createHorizontalDataTable(payload);
-
-            // Export buttons
-            html += `
-                <div style="margin-top: 10px;">
-                    <button class="btn btn-primary" onclick='exportToCSV(${JSON.stringify(payload)})'>
-                        📊 Export CSV
-                    </button>
-                    <button class="btn btn-primary" onclick='exportToJSON(${JSON.stringify(payload)})'>
-                        📄 Export JSON
-                    </button>
-                </div>`;
-
-            // Raw data
-            html += `
-                <details style="margin-top: 10px;">
-                    <summary style="cursor: pointer;">🔍 Raw Data</summary>
-                    <div class="raw-data-container">${escapeHtml(JSON.stringify(payload, null, 2))}</div>
-                </details>`;
-
-            resultDiv.innerHTML = html;
-            resultsContainer.appendChild(resultDiv);
-        }
-
-        // === Create Horizontal Data Table ===
-        function createHorizontalDataTable(data) {
-            if (!data || typeof data !== 'object') return '';
-            
-            let html = '';
-            
-            // Categorize data
-            const sections = categorizeData(data);
-            
-            // Display each section
-            for (const [sectionName, sectionData] of Object.entries(sections)) {
-                if (Array.isArray(sectionData) && sectionData.length > 0) {
-                    html += createArrayTable(sectionName, sectionData);
-                } else if (typeof sectionData === 'object' && Object.keys(sectionData).length > 0) {
-                    html += createObjectTable(sectionName, sectionData);
-                }
-            }
-            
-            return html;
-        }
-
-        // === Categorize Data ===
-        function categorizeData(data) {
-            const sections = {};
-            
-            for (const [key, value] of Object.entries(data)) {
-                if (Array.isArray(value)) {
-                    sections[key] = value;
-                } else if (typeof value === 'object' && value !== null) {
-                    sections[key] = value;
-                } else {
-                    if (!sections['ข้อมูลทั่วไป']) sections['ข้อมูลทั่วไป'] = {};
-                    sections['ข้อมูลทั่วไป'][key] = value;
-                }
-            }
-            
-            return sections;
-        }
-
-        // === Create Array Table ===
-        function createArrayTable(title, arrayData) {
-            if (!arrayData || arrayData.length === 0) return '';
-            
-            const headers = Object.keys(arrayData[0]);
-            let html = `
-                <div style="margin-top: 15px;">
-                    <h4>📦 ${escapeHtml(title)}</h4>
-                    <div class="horizontal-table-container">
-                        <table class="horizontal-table">
-                            <thead>
-                                <tr>`;
-            
-            headers.forEach(header => {
-                html += `<th>${escapeHtml(header)}</th>`;
-            });
-            
-            html += `</tr></thead><tbody>`;
-            
-            arrayData.forEach(item => {
-                html += `<tr>`;
-                headers.forEach(header => {
-                    const value = item[header] ?? '';
-                    html += `<td title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</td>`;
-                });
-                html += `</tr>`;
-            });
-            
-            html += `</tbody></table></div></div>`;
-            return html;
-        }
-
-        // === Create Object Table ===
-        function createObjectTable(title, objectData) {
-            if (!objectData || Object.keys(objectData).length === 0) return '';
-            
-            const entries = Object.entries(objectData);
-            const headers = entries.map(([key]) => key);
-            const values = entries.map(([, value]) => {
-                if (typeof value === 'object' && value !== null) {
-                    return JSON.stringify(value);
-                }
-                return String(value ?? '');
-            });
-            
-            let html = `
-                <div style="margin-top: 15px;">
-                    <h4>📋 ${escapeHtml(title)}</h4>
-                    <div class="horizontal-table-container">
-                        <table class="horizontal-table">
-                            <thead>
-                                <tr>`;
-            
-            headers.forEach(header => {
-                html += `<th>${escapeHtml(header)}</th>`;
-            });
-            
-            html += `</tr></thead><tbody><tr>`;
-            
-            values.forEach(value => {
-                html += `<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`;
-            });
-            
-            html += `</tr></tbody></table></div></div>`;
-            return html;
-        }
-
-        // === Create Total Summary Message ===
-        function createTotalSummaryMessage(info) {
-            const summaryDiv = document.createElement('div');
-            summaryDiv.className = 'result-card';
-            summaryDiv.innerHTML = `
-                <div class="summary-card" style="background: linear-gradient(135deg,#ff512f 0%,#dd2476 100%);">
-                    <h3>📊 สรุปผลรวมทั้งหมด</h3>
-                    <div>✅ จำนวนไฟล์ที่ประมวลผล: ${info.fileCount} ไฟล์</div>
-                    <div style="margin-top:8px; font-size:13px;">
-                        🟢 เริ่มทั้งหมด: ${escapeHtml(info.startDateAll)}<br>
-                        🔴 จบทั้งหมด: ${escapeHtml(info.endDateAll)}<br>
-                        ⏱ ใช้เวลา: ${escapeHtml(info.durationAllSec)} วินาที (~${escapeHtml(info.durationAllMin)} นาที)
+        // === Processing UI helpers (from index copy.html) ===
+        function createProcessingStatus(totalFiles) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'result-card';
+            statusDiv.innerHTML = `
+                <div class="processing-status">
+                    <h4>🔄 กำลังประมวลผลแบบ Parallel</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
                     </div>
+                    <div id="progressText">0 / ${totalFiles} ไฟล์</div>
+                    <div class="task-list" id="taskList"></div>
                 </div>`;
-            resultsContainer.appendChild(summaryDiv);
+            resultsContainer.insertBefore(statusDiv, resultsContainer.firstChild);
+            return statusDiv;
         }
 
+        function updateProgress(statusDiv, processed, total) {
+            const progressFill = statusDiv.querySelector('#progressFill');
+            const progressText = statusDiv.querySelector('#progressText');
+            const percentage = Math.round((processed / total) * 100);
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `${processed} / ${total} ไฟล์ (${percentage}%)`;
+        }
+
+        function updateTaskStatus(statusDiv, taskId, fileName, status) {
+            const taskList = statusDiv.querySelector('#taskList');
+            let taskItem = taskList.querySelector(`[data-task-id="${taskId}"]`);
+            if (!taskItem) {
+                taskItem = document.createElement('div');
+                taskItem.className = 'task-item';
+                taskItem.setAttribute('data-task-id', taskId);
+                taskList.appendChild(taskItem);
+            }
+            taskItem.className = `task-item ${status}`;
+            const icons = { processing: '⏳', completed: '✅', error: '❌' };
+            const statusTexts = { processing: 'กำลังประมวลผล...', completed: 'สำเร็จ', error: 'เกิดข้อผิดพลาด' };
+            taskItem.innerHTML = `
+                ${icons[status]} 
+                <span style="font-weight: bold;">${escapeHtml(fileName.substring(0, 30))}</span>
+                <span style="color: #666; font-size: 11px; margin-left:8px;">${statusTexts[status]}</span>
+            `;
+        }
+        
         // === Export Functions ===
         function exportToCSV(data) {
             try {
