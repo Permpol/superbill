@@ -985,4 +985,50 @@
             msgDiv.className = 'result-card';
 
             let timeHtml = '';
-            if
+            if (timeInfo) {
+                const duration = timeInfo.durationSec || timeInfo.duration || '';
+                timeHtml = duration ? `<div style="font-size:12px;">⏱ ใช้เวลา: ${escapeHtml(String(duration))} วินาที</div>` : '';
+            }
+
+            let tableHtml = '';
+            try {
+                tableHtml = createHorizontalDataTable(payload);
+            } catch (e) {
+                tableHtml = `<div class="raw-data-container">${escapeHtml(JSON.stringify(payload, null, 2))}</div>`;
+            }
+
+            msgDiv.innerHTML = `
+                <div class="summary-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    <h3>📊 ผลลัพธ์จากไฟล์: ${escapeHtml(fileName)}</h3>
+                    ${timeHtml}
+                </div>
+                ${tableHtml}
+                <div style="margin-top:10px; text-align:right;">
+                    <button class="btn btn-primary" onclick='(function(d,p){ try{ exportToCSV(p); }catch(e){ alert("Export CSV failed"); } })(document, ${JSON.stringify(payload)})'>📊 Export CSV</button>
+                    <button class="btn" style="margin-left:8px;" onclick='(function(d,p){ try{ exportToJSON(p); }catch(e){ alert("Export JSON failed"); } })(document, ${JSON.stringify(payload)})'>📄 Export JSON</button>
+                </div>
+            `;
+
+            resultsContainer.appendChild(msgDiv);
+            resultsContainer.scrollTop = resultsContainer.scrollHeight;
+        }
+
+        // === Create Total Summary Message ===
+        function createTotalSummaryMessage({ fileCount = 0, startDateAll = '', endDateAll = '', durationAllSec = '0.00', durationAllMin = '0.00' } = {}) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'result-card';
+            msgDiv.innerHTML = `
+                <div class="summary-card" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
+                    <h3>📊 สรุปผลการประมวลผล</h3>
+                    <div>จำนวนไฟล์ทั้งหมด: ${escapeHtml(String(fileCount))}</div>
+                    <div>เริ่ม: ${escapeHtml(String(startDateAll))}</div>
+                    <div>สิ้นสุด: ${escapeHtml(String(endDateAll))}</div>
+                    <div>⏱ เวลาทั้งหมด: ${escapeHtml(String(durationAllSec))} วินาที (${escapeHtml(String(durationAllMin))} นาที)</div>
+                </div>
+            `;
+            resultsContainer.insertBefore(msgDiv, resultsContainer.firstChild);
+            resultsContainer.scrollTop = resultsContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
