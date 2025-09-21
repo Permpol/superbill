@@ -2,7 +2,6 @@
 
 name: Deploy Superbill
 
-# ให้ workflow นี้มีสิทธิ์เขียนไฟล์ใน repo (จำเป็นเมื่อต้อง push gh-pages)
 permissions:
   contents: write
   pages: write
@@ -19,12 +18,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Create env.js from Secrets
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          API_ENDPOINT: ${{ secrets.API_ENDPOINT }}
         run: |
           cat > env.js <<'EOF'
           const CONFIG = {
@@ -32,7 +32,7 @@ jobs:
             API_KEY: "${GOOGLE_API_KEY}",
             DISCOVERY_DOCS: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
             SCOPES: "https://www.googleapis.com/auth/drive.readonly",
-            API_ENDPOINT: "${API_ENDPOINT}"
+            API_ENDPOINT: ""
           };
           export default CONFIG;
           EOF
@@ -40,5 +40,7 @@ jobs:
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GH_PAGES_PAT }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: .github
