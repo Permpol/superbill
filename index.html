@@ -504,7 +504,7 @@
         // โหลด configuration แบบ dynamic (env.js ถูกสร้างโดย GitHub Actions ในตอน deploy)
         let CONFIG;
         try {
-            // โปรดสร้างไฟล์ env.js ในเครื่องสำหรับการพัฒนาโลคอล (อย่า commit)
+            // โปรดสร้างไฟล์ env.js ในเครื่องสำหรับการพัฒนาโลคาล (อย่า commit)
             CONFIG = (await import('./env.js')).default;
         } catch (err) {
             // ถ้าไม่มี env.js ให้ลองโหลด env.template.js (สำหรับการพัฒนา ถ้าแก้ค่าแล้วใช้เอง)
@@ -543,6 +543,10 @@
         const fetchDriveBtn = document.getElementById("fetchDriveBtn");
         const googleAuthBtn = document.getElementById("googleAuthBtn");
 
+        // ป้องกันการกดก่อนที่ gapi จะพร้อม
+        let gapiReady = false;
+        googleAuthBtn.disabled = true;
+
         // === Google API Initialization ===
         function initGoogleAPI() {
             gapi.load('client:auth2', () => {
@@ -552,16 +556,23 @@
                     discoveryDocs: DISCOVERY_DOCS,
                     scope: SCOPES
                 }).then(() => {
-                    // Listen for sign-in state changes
-                    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                    // enable auth button only after init success
+                    gapiReady = true;
+                    googleAuthBtn.disabled = !CLIENT_ID || !API_KEY;
                     
-                    // Handle initial sign-in state
-                    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-                }).catch(error => {
-                    console.error('Error initializing Google API:', error);
-                    showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ใน Google Cloud Console ก่อน', 'error');
-                });
-            });
+                     // Listen for sign-in state changes
+                     gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                     
+                     // Handle initial sign-in state
+                     updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+                 }).catch(error => {
+                     console.error('Error initializing Google API:', error);
+                     showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ใน Google Cloud Console ก่อน', 'error');
+                     // keep auth button disabled on error
+                     gapiReady = false;
+                     googleAuthBtn.disabled = true;
+                 });
+             });
         }
 
         // === Update Sign-in Status ===
@@ -580,13 +591,30 @@
         }
 
         // === Google Sign-in ===
-        googleAuthBtn.addEventListener('click', () => {
+        googleAuthBtn.addEventListener('click', async () => {
+            if (!gapiReady || !window.gapi || !gapi.auth2 || !gapi.auth2.getAuthInstance) {
+                showMessage('⚠️ Google API ยังไม่พร้อม กรุณารอสักครู่', 'error');
+                console.error('gapi not ready', window.gapi);
+                return;
+            }
+
+            const authInstance = gapi.auth2.getAuthInstance();
+            if (!authInstance) {
+                showMessage('⚠️ ไม่สามารถเข้าถึง Google auth instance ได้', 'error');
+                console.error('authInstance missing', gapi);
+                return;
+            }
+
             if (!isSignedIn) {
-                gapi.auth2.getAuthInstance().signIn();
+                try {
+                    await authInstance.signIn();
+                } catch (err) {
+                    console.error('signIn failed', err);
+                    showMessage('❌ เข้าสู่ระบบไม่สำเร็จ', 'error');
+                }
             } else {
-                // Optional: Sign out
                 if (confirm('ต้องการออกจากระบบ Google?')) {
-                    gapi.auth2.getAuthInstance().signOut();
+                    try { await authInstance.signOut(); } catch (err) { console.error('signOut failed', err); }
                 }
             }
         });
