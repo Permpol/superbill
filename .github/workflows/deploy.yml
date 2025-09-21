@@ -2,6 +2,11 @@
 
 name: Deploy Superbill
 
+# ให้ workflow นี้มีสิทธิ์เขียนไฟล์ใน repo (จำเป็นเมื่อต้อง push gh-pages)
+permissions:
+  contents: write
+  pages: write
+
 on:
   push:
     branches: [ main ]
@@ -35,5 +40,5 @@ jobs:
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PAGES_PAT }}
           publish_dir: .
