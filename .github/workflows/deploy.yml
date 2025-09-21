@@ -1,31 +1,35 @@
 # 📦 deploy.yml
 
-name: Deploy Web App
+name: Deploy Superbill
 
 on:
   push:
-    branches: [main]   # หรือเปลี่ยนเป็น branch ที่คุณใช้
-
-permissions:
-  contents: write      # ต้องการสิทธิ์ push ไป gh-pages
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout source code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - name: 🧪 Inject Secrets to env.js
+      - name: Create env.js from Secrets
         run: |
-          echo "window.ENV = {" > env.js
-          echo "  GOOGLE_CLIENT_ID: '${{ secrets.GOOGLE_CLIENT_ID }}'," >> env.js
-          echo "  GOOGLE_API_KEY: '${{ secrets.GOOGLE_API_KEY }}'" >> env.js
-          echo "};" >> env.js
+          cat > env.js <<'EOF'
+          const CONFIG = {
+            CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID }}",
+            API_KEY: "${{ secrets.GOOGLE_API_KEY }}",
+            DISCOVERY_DOCS: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+            SCOPES: "https://www.googleapis.com/auth/drive.readonly",
+            API_ENDPOINT: "${{ secrets.API_ENDPOINT }}"
+          };
+          export default CONFIG;
+          EOF
 
-      - name: 🚀 Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./   # หรือ ./dist ถ้าใช้ build tools
+          publish_dir: .

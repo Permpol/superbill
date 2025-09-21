@@ -501,7 +501,27 @@
     <!-- Load Google API -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script type="module">
-        import CONFIG from './env.js';
+        // โหลด configuration แบบ dynamic (env.js ถูกสร้างโดย GitHub Actions ในตอน deploy)
+        let CONFIG;
+        try {
+            // โปรดสร้างไฟล์ env.js ในเครื่องสำหรับการพัฒนาโลคอล (อย่า commit)
+            CONFIG = (await import('./env.js')).default;
+        } catch (err) {
+            // ถ้าไม่มี env.js ให้ลองโหลด env.template.js (สำหรับการพัฒนา ถ้าแก้ค่าแล้วใช้เอง)
+            try {
+                CONFIG = (await import('./env.template.js')).default;
+                console.warn('Loaded env.template.js — replace with env.js for production.');
+            } catch (err2) {
+                console.error('Missing env.js and env.template.js. Create a local env.js or set GitHub Secrets for CI deploy.');
+                CONFIG = {
+                    CLIENT_ID: '',
+                    API_KEY: '',
+                    DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+                    SCOPES: 'https://www.googleapis.com/auth/drive.readonly',
+                    API_ENDPOINT: ''
+                };
+            }
+        }
         
         // === Configuration ===
         const CLIENT_ID = CONFIG.CLIENT_ID;
