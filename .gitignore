@@ -1,12 +1,13 @@
 # Environment file generated at deploy-time
 env.js
 
-// Local dev only — DO NOT COMMIT real secrets
-const CONFIG = {
-  CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-  API_KEY: "YOUR_GOOGLE_API_KEY",
-  DISCOVERY_DOCS: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
-  SCOPES: "https://www.googleapis.com/auth/drive.readonly",
-  API_ENDPOINT: ""
-};
-export default CONFIG;
+# Local env example (do not commit)
+.env
+
+# Node / build / IDE
+node_modules/
+dist/
+build/
+.vscode/
+.DS_Store
+Thumbs.db

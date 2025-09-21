@@ -502,6 +502,7 @@
                 log('Attempting to load configuration from env.js...');
                 CONFIG = (await import('./env.js')).default;
                 log('Successfully loaded env.js');
+                console.info('DEBUG: CONFIG loaded:', CONFIG);
             } catch (e) {
                 log('env.js not found, falling back to env.template.js', 'warning');
                 try {
