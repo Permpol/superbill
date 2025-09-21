@@ -138,14 +138,10 @@
     </div>
 
     <script src="https://apis.google.com/js/api.js"></script>
-    <script>
+    <script type="module">
         // === Configuration ===
-        const CONFIG = {
-            CLIENT_ID: '',
-            API_KEY: '',
-            DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-            SCOPES: 'https://www.googleapis.com/auth/drive.readonly'
-        };
+        // This will be populated by the dynamic import below
+        let CONFIG = {};
 
         // === Global Variables ===
         let isGapiLoaded = false;
@@ -467,8 +463,25 @@
         });
 
         // === Initialize ===
-        window.onload = function() {
+        window.onload = async function() {
             log('Application starting...');
+
+            // --- DYNAMIC CONFIGURATION LOADING ---
+            try {
+                log('Attempting to load configuration from env.js...');
+                CONFIG = (await import('./env.js')).default;
+                log('Successfully loaded env.js');
+            } catch (e) {
+                log('env.js not found, falling back to env.template.js', 'warning');
+                try {
+                    CONFIG = (await import('./env.template.js')).default;
+                    log('Successfully loaded env.template.js');
+                } catch (e2) {
+                    log('Failed to load any configuration file (env.js or env.template.js)', 'error');
+                    // Set a default empty config to prevent further errors
+                    CONFIG = { CLIENT_ID: '', API_KEY: '', DISCOVERY_DOCS: [], SCOPES: '' };
+                }
+            }
             
             // Check if Google API script is loaded
             if (window.gapi) {
