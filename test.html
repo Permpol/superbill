@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth Test - Alternative Method</title>
+</head>
+<body>
+    <h1>OAuth Test - Alternative Method</h1>
+    <div id="status">Loading...</div>
+    <button id="testBtn" disabled>Test Direct OAuth</button>
+    <div id="output"></div>
+
+    <script>
+        // ลองใช้ Google Identity Services (ใหม่กว่า)
+        function loadGoogleIdentity() {
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.onload = initializeGoogleIdentity;
+            script.onerror = () => {
+                document.getElementById('status').textContent = 'Failed to load Google Identity Services';
+            };
+            document.head.appendChild(script);
+        }
+
+        function initializeGoogleIdentity() {
+            const CLIENT_ID = "171730649633-qaa4lhi484g7srrbot6p394jq7an35h7.apps.googleusercontent.com";
+            
+            window.google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse
+            });
+
+            document.getElementById('status').textContent = 'Google Identity Services loaded successfully';
+            document.getElementById('testBtn').disabled = false;
+            
+            // ลองแสดง sign-in button
+            window.google.accounts.id.renderButton(
+                document.getElementById('testBtn'),
+                { 
+                    theme: "outline", 
+                    size: "large",
+                    text: "signin_with",
+                    shape: "rectangular"
+                }
+            );
+        }
+
+        function handleCredentialResponse(response) {
+            document.getElementById('output').innerHTML = `
+                <h3>Success!</h3>
+                <p>JWT Token received (first 50 chars): ${response.credential.substring(0, 50)}...</p>
+                <p>This means OAuth is working correctly.</p>
+            `;
+        }
+
+        document.getElementById('testBtn').addEventListener('click', () => {
+            // ลอง prompt sign-in
+            window.google.accounts.id.prompt();
+        });
+
+        // เริ่มต้น
+        loadGoogleIdentity();
+    </script>
+</body>
+</html>
