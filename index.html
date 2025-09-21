@@ -1124,11 +1124,10 @@
 
         // === Initialize Google API on Load ===
         window.onload = function() {
-            // Check if API Key and Client ID are configured
-            if (!CLIENT_ID || !API_KEY) {
-                showMessage('⚠️ Missing Google API configuration', 'error');
-                
-                // Disable Google Drive buttons
+            // Treat GitHub Actions placeholders as "missing" for local runtime
+            const isPlaceholder = v => !v || (typeof v === 'string' && v.includes('${{'));
+            if (isPlaceholder(CLIENT_ID) || isPlaceholder(API_KEY)) {
+                showMessage('⚠️ Missing Google API configuration — สร้าง local env.js หรือตั้งค่า GitHub Secrets แล้ว deploy', 'error');
                 googleAuthBtn.disabled = true;
                 fetchDriveBtn.disabled = true;
                 googleAuthBtn.textContent = '⚠️ API Configuration Missing';
