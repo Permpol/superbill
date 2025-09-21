@@ -520,18 +520,28 @@
                 const downloadPromises = files.map(async (file, index) => {
                     try {
                         log(`Downloading file ${index + 1}/${files.length}: ${file.name}`);
-                        
-                        const resp = await gapi.client.drive.files.get({
-                            fileId: file.id,
-                            alt: 'media'
+
+                        if (!accessToken) {
+                            throw new Error('No OAuth access token (accessToken is null). Please sign in and allow Drive access.');
+                        }
+
+                        const url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+                        const resp = await fetch(url, {
+                            headers: { Authorization: `Bearer ${accessToken}` }
                         });
-                        
-                        // Convert response to blob
-                        const blob = new Blob([resp.body], { type: file.mimeType });
+
+                        if (!resp.ok) {
+                            const txt = await resp.text().catch(()=>'');
+                            throw new Error(`HTTP ${resp.status} ${resp.statusText}${txt ? ' - '+txt.slice(0,200) : ''}`);
+                        }
+
+                        const blob = await resp.blob();
+                        if (!blob || blob.size === 0) {
+                            throw new Error('Downloaded blob is empty');
+                        }
+
                         const fileObj = new File([blob], file.name, { type: file.mimeType });
-                        
                         return fileObj;
-                        
                     } catch (error) {
                         log(`Failed to download ${file.name}: ${error.message}`, 'error');
                         return null;
