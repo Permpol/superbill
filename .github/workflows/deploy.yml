@@ -1,0 +1,31 @@
+# 📦 deploy.yml
+
+name: Deploy Web App
+
+on:
+  push:
+    branches: [main]   # หรือเปลี่ยนเป็น branch ที่คุณใช้
+
+permissions:
+  contents: write      # ต้องการสิทธิ์ push ไป gh-pages
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout source code
+        uses: actions/checkout@v4
+
+      - name: 🧪 Inject Secrets to env.js
+        run: |
+          echo "window.ENV = {" > env.js
+          echo "  GOOGLE_CLIENT_ID: '${{ secrets.GOOGLE_CLIENT_ID }}'," >> env.js
+          echo "  GOOGLE_API_KEY: '${{ secrets.GOOGLE_API_KEY }}'" >> env.js
+          echo "};" >> env.js
+
+      - name: 🚀 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./   # หรือ ./dist ถ้าใช้ build tools
