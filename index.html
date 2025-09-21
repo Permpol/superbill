@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Bill Calculator - Debug Version</title>
+    <title>Enhanced Bill Calculator - OAuth Only</title>
     <style>
-        /* Same styles as before but simplified for debugging */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -94,8 +93,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧾 Enhanced Bill Calculator - Debug Version</h1>
-            <p>สำหรับทดสอบและแก้ไขปัญหา Google Drive Integration</p>
+            <h1>🧾 Enhanced Bill Calculator - OAuth Only</h1>
+            <p>ใช้ OAuth เท่านั้น ไม่ต้อง API Key</p>
         </div>
 
         <!-- Configuration Status -->
@@ -106,8 +105,8 @@
 
         <!-- Google API Status -->
         <div class="section">
-            <h3>🔑 Google API Status</h3>
-            <button class="btn btn-google" id="testGoogleApiBtn">🧪 Test Google API Load</button>
+            <h3>🔑 Google OAuth Status</h3>
+            <button class="btn btn-google" id="testGoogleApiBtn">🧪 Test OAuth Setup</button>
             <button class="btn btn-google" id="googleAuthBtn" disabled>🔐 เข้าสู่ระบบ Google</button>
             <div id="googleApiStatus" class="status info">รอการทดสอบ...</div>
         </div>
@@ -139,9 +138,12 @@
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script type="module">
-        // === Configuration ===
-        // This will be populated by the dynamic import below
-        let CONFIG = {};
+        // === OAuth-Only Configuration ===
+        let CONFIG = {
+            CLIENT_ID: "171730649633-qaa4lhi484g7srrbot6p394jq7an35h7.apps.googleusercontent.com",
+            DISCOVERY_DOCS: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+            SCOPES: "https://www.googleapis.com/auth/drive.readonly"
+        };
 
         // === Global Variables ===
         let isGapiLoaded = false;
@@ -181,18 +183,12 @@
 
         // === Check Configuration ===
         function checkConfiguration() {
-            log('Checking configuration...');
+            log('Checking OAuth-only configuration...');
             
             const issues = [];
             
-            // Check for empty, "YOUR_" placeholder, or GitHub Actions placeholder
             if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.includes('YOUR_') || CONFIG.CLIENT_ID.includes('${{')) {
                 issues.push('CLIENT_ID ไม่ได้ตั้งค่า');
-            }
-            
-            // Check for empty, "YOUR_" placeholder, or GitHub Actions placeholder
-            if (!CONFIG.API_KEY || CONFIG.API_KEY.includes('YOUR_') || CONFIG.API_KEY.includes('${{')) {
-                issues.push('API_KEY ไม่ได้ตั้งค่า');
             }
             
             if (issues.length > 0) {
@@ -200,18 +196,18 @@
                 log('Configuration issues found: ' + issues.join(', '), 'error');
                 return false;
             } else {
-                setStatus(configStatus, '✅ Configuration ครบถ้วน', 'success');
-                log('Configuration OK', 'success');
+                setStatus(configStatus, '✅ OAuth Configuration ครบถ้วน (ไม่ต้อง API Key)', 'success');
+                log('OAuth Configuration OK - no API Key needed', 'success');
                 return true;
             }
         }
 
-        // === Test Google API Loading ===
+        // === Test Google OAuth Setup ===
         testGoogleApiBtn.addEventListener('click', async () => {
             testGoogleApiBtn.disabled = true;
             testGoogleApiBtn.textContent = '🔄 กำลังทดสอบ...';
             
-            log('Testing Google API loading...');
+            log('Testing Google OAuth setup...');
             
             try {
                 if (!window.gapi) {
@@ -221,40 +217,31 @@
                 log('gapi object found');
                 setStatus(googleApiStatus, '✅ Google API Script โหลดสำเร็จ', 'success');
                 
-                // Test gapi.load
+                // Load auth2 only (no client needed for OAuth-only approach)
                 await new Promise((resolve, reject) => {
-                    log('Loading gapi client and auth2...');
-                    gapi.load('client:auth2', {
+                    log('Loading gapi auth2...');
+                    gapi.load('auth2', {
                         callback: resolve,
                         onerror: (err) => {
                             console.error('gapi.load error', err);
-                            reject(new Error('Failed to load gapi modules'));
+                            reject(new Error('Failed to load gapi auth2'));
                         }
                     });
                 });
                 
-                log('gapi modules loaded successfully');
+                log('gapi auth2 loaded successfully');
                 
-                // Test gapi.client.init
-                try {
-                    await gapi.client.init({
-                        apiKey: CONFIG.API_KEY,
-                        clientId: CONFIG.CLIENT_ID,
-                        discoveryDocs: CONFIG.DISCOVERY_DOCS,
-                        scope: CONFIG.SCOPES
-                    });
-                } catch (initError) {
-                    console.error('gapi.client.init error', initError);
-                    throw new Error(`gapi.client.init failed: ${initError.message}`);
-                }
+                // Initialize auth2 only
+                const authInstance = await gapi.auth2.init({
+                    client_id: CONFIG.CLIENT_ID,
+                    scope: CONFIG.SCOPES
+                });
                 
-                log('gapi.client.init completed');
+                log('gapi.auth2.init completed');
                 
-                // Test auth instance
-                const authInstance = gapi.auth2.getAuthInstance();
                 if (authInstance) {
                     log('Auth instance created successfully');
-                    setStatus(googleApiStatus, '✅ Google API พร้อมใช้งาน', 'success');
+                    setStatus(googleApiStatus, '✅ Google OAuth พร้อมใช้งาน', 'success');
                     
                     googleAuthBtn.disabled = false;
                     isGapiLoaded = true;
@@ -268,21 +255,20 @@
                 }
                 
             } catch (error) {
-                // Log the full error object for better debugging
-                console.error("Full GAPI error object:", error); 
-                const errorMessage = error?.result?.error?.message || error?.message || 'Unknown error during gapi.client.init';
-                log(`Google API test failed: ${errorMessage}`, 'error');
+                console.error("Full OAuth error object:", error); 
+                const errorMessage = error?.result?.error?.message || error?.message || 'Unknown OAuth error';
+                log(`Google OAuth test failed: ${errorMessage}`, 'error');
                 setStatus(googleApiStatus, `❌ ล้มเหลว: ${errorMessage}`, 'error');
             } finally {
                 testGoogleApiBtn.disabled = false;
-                testGoogleApiBtn.textContent = '🧪 Test Google API Load';
+                testGoogleApiBtn.textContent = '🧪 Test OAuth Setup';
             }
         });
 
         // === Google Sign-in ===
         googleAuthBtn.addEventListener('click', async () => {
             if (!isGapiLoaded) {
-                setStatus(googleApiStatus, '❌ Google API ยังไม่พร้อม กรุณาทดสอบก่อน', 'error');
+                setStatus(googleApiStatus, '❌ Google OAuth ยังไม่พร้อม กรุณาทดสอบก่อน', 'error');
                 return;
             }
             
@@ -311,7 +297,10 @@
             if (signedIn) {
                 googleAuthBtn.textContent = '✅ ออกจากระบบ';
                 googleAuthBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
-                fetchDriveBtn.disabled = false;
+                
+                // Initialize Drive API client after successful sign-in
+                initializeDriveAPI();
+                
                 setStatus(googleApiStatus, '✅ เข้าสู่ระบบ Google สำเร็จ', 'success');
                 
                 // Get user info
@@ -324,6 +313,33 @@
                 googleAuthBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #fbbc05 100%)';
                 fetchDriveBtn.disabled = true;
                 setStatus(googleApiStatus, '⏳ ยังไม่ได้เข้าสู่ระบบ', 'warning');
+            }
+        }
+
+        // === Initialize Drive API Client After Sign-in ===
+        async function initializeDriveAPI() {
+            try {
+                log('Initializing Drive API client...');
+                
+                // Load gapi client
+                await new Promise((resolve, reject) => {
+                    gapi.load('client', {
+                        callback: resolve,
+                        onerror: reject
+                    });
+                });
+                
+                // Initialize client with minimal config (no API key needed with OAuth)
+                await gapi.client.init({
+                    discoveryDocs: CONFIG.DISCOVERY_DOCS
+                });
+                
+                log('Drive API client initialized successfully');
+                fetchDriveBtn.disabled = false;
+                
+            } catch (error) {
+                log(`Failed to initialize Drive API: ${error.message}`, 'error');
+                setStatus(googleApiStatus, `❌ Drive API init failed: ${error.message}`, 'error');
             }
         }
 
@@ -372,8 +388,8 @@
                 
                 setStatus(driveStatus, `✅ พบรูปภาพ ${files.length} ไฟล์ กำลังดาวน์โหลด...`, 'success');
                 
-                // Download files (limit to first 10 for testing)
-                const limitedFiles = files.slice(0, 10);
+                // Download files (limit to first 5 for testing)
+                const limitedFiles = files.slice(0, 5);
                 log(`Downloading ${limitedFiles.length} files...`);
                 
                 const downloadPromises = limitedFiles.map(async (file, index) => {
@@ -385,16 +401,12 @@
                             alt: 'media'
                         });
                         
-                        // Convert to blob
-                        const blob = new Blob([resp.body], { type: file.mimeType });
+                        // Convert response to blob
+                        const arrayBuffer = new TextEncoder().encode(resp.body);
+                        const blob = new Blob([arrayBuffer], { type: file.mimeType });
                         
                         if (blob.size === 0) {
                             log(`❌ File ${file.name} has zero size`, 'error');
-                            return null;
-                        }
-                        
-                        if (!file.mimeType.startsWith('image/')) {
-                            log(`❌ File ${file.name} is not an image`, 'error');
                             return null;
                         }
                         
@@ -479,12 +491,10 @@
                         console.log('Response data:', data);
                     } else {
                         log(`❌ Failed to process ${file.name}: ${response.statusText}`, 'error');
-                        setStatus(driveStatus, `❌ Failed to process ${file.name}: ${response.statusText}`, 'error');
                     }
                     
                 } catch (error) {
                     log(`❌ Error processing ${file.name}: ${error.message}`, 'error');
-                    setStatus(driveStatus, `❌ Error processing ${file.name}: ${error.message}`, 'error');
                 }
             }
             
@@ -495,24 +505,16 @@
 
         // === Initialize ===
         window.onload = async function() {
-            log('Application starting...');
+            log('Application starting with OAuth-only configuration...');
 
-            // --- DYNAMIC CONFIGURATION LOADING ---
+            // Try to load external config, but fallback to embedded config
             try {
                 log('Attempting to load configuration from env.js...');
-                CONFIG = (await import('./env.js')).default;
-                log('Successfully loaded env.js');
-                console.info('DEBUG: CONFIG loaded:', CONFIG);
+                const externalConfig = (await import('./env.js')).default;
+                CONFIG = { ...CONFIG, ...externalConfig };
+                log('Successfully loaded and merged env.js');
             } catch (e) {
-                log('env.js not found, falling back to env.template.js', 'warning');
-                try {
-                    CONFIG = (await import('./env.template.js')).default;
-                    log('Successfully loaded env.template.js');
-                } catch (e2) {
-                    log('Failed to load any configuration file (env.js or env.template.js)', 'error');
-                    // Set a default empty config to prevent further errors
-                    CONFIG = { CLIENT_ID: '', API_KEY: '', DISCOVERY_DOCS: [], SCOPES: '' };
-                }
+                log('env.js not found, using embedded OAuth configuration', 'info');
             }
             
             // Check if Google API script is loaded
@@ -527,7 +529,7 @@
             const configOK = checkConfiguration();
             
             if (!configOK) {
-                log('Configuration incomplete - please check CLIENT_ID and API_KEY', 'error');
+                log('Configuration incomplete - please check CLIENT_ID', 'error');
                 testGoogleApiBtn.disabled = true;
             }
             
