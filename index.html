@@ -432,7 +432,7 @@
             return JSON.parse(jsonPayload);
         }
 
-        // === Initialize GAPI Client ===
+        // === Initialize Gapi Client ===
         function initializeGapiClient() {
             log('Initializing GAPI client...');
             
@@ -642,8 +642,18 @@
             const startTimeAll = Date.now();
             const startDateAll = new Date(startTimeAll).toLocaleString('th-TH');
 
-            for (const file of selectedFiles) {
-                await processSingleFile(file);
+            // Process files in parallel with a limit of 3 concurrent requests
+            const CONCURRENT_LIMIT = 3;
+            const chunks = [];
+            
+            // Split files into chunks of CONCURRENT_LIMIT size
+            for (let i = 0; i < selectedFiles.length; i += CONCURRENT_LIMIT) {
+                chunks.push(selectedFiles.slice(i, i + CONCURRENT_LIMIT));
+            }
+            
+            // Process each chunk in parallel
+            for (const chunk of chunks) {
+                await Promise.all(chunk.map(file => processSingleFile(file)));
             }
 
             const endTimeAll = Date.now();
@@ -675,10 +685,13 @@
             const formData = new FormData();
             formData.append('file', file);
 
+            // Generate unique ID for this task
+           const taskId = `task_${file.name}_${Date.now()}`;
+
             // Show loading
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'result-card';
-            loadingDiv.id = `processing_${file.name}`;
+           loadingDiv.id = taskId;
             loadingDiv.innerHTML = `
                 <div class="loading-container">
                     <div class="spinner"></div>
@@ -693,7 +706,7 @@
                 });
 
                 const data = await res.json();
-                document.getElementById(`processing_${file.name}`)?.remove();
+               document.getElementById(taskId)?.remove();
 
                 const payload = Array.isArray(data) ? data[0] : data;
                 if (!payload || typeof payload !== 'object') {
@@ -707,7 +720,7 @@
                 createResultMessage(file.name, payload, { startDateStr, endDateStr, durationSec });
 
             } catch (error) {
-                document.getElementById(`processing_${file.name}`)?.remove();
+               document.getElementById(taskId)?.remove();
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'result-card';
                 errorDiv.innerHTML = `
