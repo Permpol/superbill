@@ -185,11 +185,13 @@
             
             const issues = [];
             
-            if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.includes('YOUR_')) {
+            // Check for empty, "YOUR_" placeholder, or GitHub Actions placeholder
+            if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.includes('YOUR_') || CONFIG.CLIENT_ID.includes('${{')) {
                 issues.push('CLIENT_ID ไม่ได้ตั้งค่า');
             }
             
-            if (!CONFIG.API_KEY || CONFIG.API_KEY.includes('YOUR_')) {
+            // Check for empty, "YOUR_" placeholder, or GitHub Actions placeholder
+            if (!CONFIG.API_KEY || CONFIG.API_KEY.includes('YOUR_') || CONFIG.API_KEY.includes('${{')) {
                 issues.push('API_KEY ไม่ได้ตั้งค่า');
             }
             
@@ -258,8 +260,11 @@
                 }
                 
             } catch (error) {
-                log(`Google API test failed: ${error.message}`, 'error');
-                setStatus(googleApiStatus, `❌ ล้มเหลว: ${error.message}`, 'error');
+                // Log the full error object for better debugging
+                console.error("Full GAPI error object:", error); 
+                const errorMessage = error?.result?.error?.message || error?.message || 'Unknown error during gapi.client.init';
+                log(`Google API test failed: ${errorMessage}`, 'error');
+                setStatus(googleApiStatus, `❌ ล้มเหลว: ${errorMessage}`, 'error');
             } finally {
                 testGoogleApiBtn.disabled = false;
                 testGoogleApiBtn.textContent = '🧪 Test Google API Load';
