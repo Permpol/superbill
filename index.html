@@ -701,7 +701,7 @@
         });
 
         // === Process Single File ===
-        // now accepts optional statusDiv to update per-task UI
+        // now supports async jobs from server (polling) to wait until n8n finishes
         async function processSingleFile(file, statusDiv = null) {
             const startTime = Date.now();
             const taskId = `task_${file.name.replace(/\s+/g,'_')}_${Date.now()}`;
@@ -721,6 +721,48 @@
                 </div>`;
             resultsContainer.appendChild(loadingDiv);
 
+            // Helper: poll a job URL until final result or timeout
+            async function pollJob(jobUrl, timeoutMs = 60000) {
+                const start = Date.now();
+                let delay = 1000;
+                while (Date.now() - start < timeoutMs) {
+                    await new Promise(r => setTimeout(r, delay));
+                    try {
+                        log(`Polling job URL: ${jobUrl}`);
+                        const r = await fetch(jobUrl, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
+                        const txt = await r.text().catch(()=>'');
+                        if (!r.ok) {
+                            log(`Poll returned HTTP ${r.status}`, 'info');
+                        }
+                        if (txt && txt.trim()) {
+                            try {
+                                const parsed = JSON.parse(txt);
+                                // common patterns: { status: 'processing'|'completed', result: {...} } or direct result
+                                if (parsed && typeof parsed === 'object') {
+                                    if (parsed.status && parsed.status !== 'completed') {
+                                        // still processing, continue polling
+                                    } else if (parsed.result) {
+                                        return parsed.result;
+                                    } else {
+                                        // assume parsed is final payload
+                                        return parsed;
+                                    }
+                                }
+                            } catch (e) {
+                                // not JSON — if body exists return it as-is (attempt)
+                                return txt;
+                            }
+                        }
+                        // backoff
+                        delay = Math.min(delay * 1.8, 5000);
+                    } catch (err) {
+                        log(`Poll error: ${err.message}`, 'info');
+                        delay = Math.min(delay * 1.8, 5000);
+                    }
+                }
+                throw new Error('Timeout waiting for server to finish (polling)');
+            }
+
             try {
                 const apiBase = (CONFIG && CONFIG.API_ENDPOINT) ? String(CONFIG.API_ENDPOINT).replace(/\/+$/g, '') : '';
                 const endpoint = apiBase ? `${apiBase}/webhook/aip1` : 'https://allie-capacitive-kaiden.ngrok-free.app/webhook-test/aip1';
@@ -730,32 +772,58 @@
                     body: formData
                 });
 
-                // always read text first to avoid res.json() throwing on empty body
-                const txt = await res.text();
+                const txt = await res.text().catch(()=>'');
 
-                if (!res.ok) {
-                    const snippet = txt ? ` Response body: ${txt.slice(0,200)}` : '';
-                    throw new Error(`HTTP ${res.status} ${res.statusText}${snippet}`);
-                }
+                // If server indicates async via 202 or Location header, or body empty -> poll
+                const locationHeader = res.headers.get('Location') || res.headers.get('location') || null;
+                const asyncHeader = res.headers.get('X-Async-Job-Url') || res.headers.get('x-async-job-url') || null;
 
-                if (!txt || txt.trim() === '') {
-                    throw new Error('Empty response body from server');
-                }
+                let finalData = null;
 
-                let data;
-                try {
-                    data = JSON.parse(txt);
-                } catch (e) {
-                    // include small snippet to help debugging (no secrets)
-                    const preview = txt.length > 300 ? txt.slice(0,300) + '...' : txt;
-                    throw new Error(`Invalid JSON response: ${preview}`);
+                if (res.status === 202 || locationHeader || asyncHeader || !txt || txt.trim() === '') {
+                    // Determine job URL
+                    let jobUrl = asyncHeader || locationHeader;
+                    if (!jobUrl) {
+                        // try parse JSON for job id in body
+                        try {
+                            const maybe = txt ? JSON.parse(txt) : null;
+                            if (maybe && (maybe.job_id || maybe.jobUrl || maybe.jobUrlRelative || maybe.statusUrl)) {
+                                jobUrl = maybe.jobUrl || maybe.statusUrl || (maybe.job_id ? `${apiBase}/jobs/${maybe.job_id}` : null);
+                            }
+                        } catch (_) { /* ignore */ }
+                    }
+
+                    if (!jobUrl) {
+                        // If no job URL, attempt polling a conventional status endpoint derived from original endpoint
+                        jobUrl = endpoint.replace(/\/webhook.*$/, '/job-status') ;
+                        log(`No job URL returned; using fallback poll endpoint: ${jobUrl}`, 'info');
+                    } else if (jobUrl && jobUrl.startsWith('/')) {
+                        // make absolute if relative
+                        jobUrl = (apiBase || window.location.origin) + jobUrl;
+                    }
+
+                    updateTaskStatus(statusDiv, taskId, file.name, 'processing');
+                    log(`Server returned async response; polling for result at ${jobUrl}`);
+                    const polled = await pollJob(jobUrl, 90000); // wait up to 90s
+                    finalData = polled;
+                } else {
+                    // synchronous response present — try parse
+                    if (!txt || txt.trim() === '') {
+                        throw new Error('Empty response body from server');
+                    }
+                    try {
+                        finalData = JSON.parse(txt);
+                    } catch (e) {
+                        // server returned non-JSON text but not empty; treat as error
+                        throw new Error(`Invalid JSON response: ${txt.slice(0,300)}${txt.length>300?'...':''}`);
+                    }
                 }
 
                 document.getElementById(`loading_${taskId}`)?.remove();
 
-                const payload = Array.isArray(data) ? data[0] : data;
+                const payload = Array.isArray(finalData) ? finalData[0] : finalData;
                 if (!payload || typeof payload !== 'object') {
-                    throw new Error('รูปแบบข้อมูลตอบกลับไม่ถูกต้อง');
+                    throw new Error('รูปแบบข้อมูลตอบกลับไม่ถูกต้อง (final payload)');
                 }
 
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
