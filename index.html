@@ -425,40 +425,6 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        .config-section {
-            padding: 12px;
-            background: #ffeaa7;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border-left: 4px solid #fdcb6e;
-        }
-
-        .config-input {
-            padding: 8px 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 13px;
-            margin: 5px;
-            width: 300px;
-        }
-
-        .config-btn {
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 13px;
-            margin: 5px;
-        }
-
-        .config-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 184, 148, 0.4);
-        }
     </style>
 </head>
 <body>
@@ -473,35 +439,19 @@
                 <div class="message-content">
                     <strong>🎯 ยินดีต้อนรับสู่ Enhanced Bill Calculator!</strong><br><br>
                     
-                    📋 <strong>ฟีเจอร์:</strong><br>
+                    📋 <strong>ฟีเจอร์ใหม่:</strong><br>
                     • 🔗 ดึงภาพจาก Google Drive โดยตรง<br>
                     • ⚡ ประมวลผลแบบ Parallel Processing<br>
                     • 📊 Real-time Progress Tracking<br><br>
                     
-                    ⚠️ <strong>การตั้งค่า Google API:</strong><br>
-                    1. กรอก Client ID และ API Key ด้านล่าง<br>
-                    2. หรือโหลดจาก config.json<br>
-                    3. จากนั้นจึงจะใช้งาน Google Drive ได้<br><br>
+                    📋 <strong>วิธีใช้งาน:</strong><br>
+                    1. กดปุ่ม "เข้าสู่ระบบ Google" เพื่ออนุญาตการเข้าถึง<br>
+                    2. ใส่ URL Google Drive Folder ที่แชร์แล้ว<br>
+                    3. กดปุ่ม "ดึงภาพจาก Drive"<br>
+                    4. หรืออัพโหลดรูปภาพบิลโดยตรง<br>
+                    5. กดปุ่ม "ประมวลผลแบบ Parallel"<br><br>
                     
-                    💡 <strong>รองรับ:</strong> JPG, PNG, WebP (สูงสุด 100 ไฟล์)
-                </div>
-            </div>
-            
-            <!-- Configuration Section -->
-            <div class="message bot">
-                <div class="message-content">
-                    <div class="config-section" id="configSection">
-                        <strong>⚙️ ตั้งค่า Google API Credentials:</strong><br>
-                        <small>สร้างได้จาก <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></small><br><br>
-                        
-                        <input type="text" id="clientIdInput" class="config-input" placeholder="Client ID (xxx.apps.googleusercontent.com)">
-                        <input type="password" id="apiKeyInput" class="config-input" placeholder="API Key"><br>
-                        
-                        <button class="config-btn" onclick="saveConfig()">💾 บันทึกการตั้งค่า</button>
-                        <button class="config-btn" onclick="loadConfigFromFile()">📁 โหลดจาก config.json</button>
-                        
-                        <div id="configStatus" style="margin-top: 10px; font-size: 12px;"></div>
-                    </div>
+                    💡 <strong>รองรับ:</strong> JPG, PNG, WebP
                 </div>
             </div>
         </div>
@@ -518,7 +468,7 @@
                         placeholder="https://drive.google.com/drive/folders/..."
                         value=""
                     >
-                    <button class="google-auth-btn" id="googleAuthBtn" disabled>
+                    <button class="google-auth-btn" id="googleAuthBtn">
                         🔐 เข้าสู่ระบบ Google
                     </button>
                     <button class="sheets-btn" id="fetchDriveBtn" disabled>
@@ -550,750 +500,620 @@
 
     <!-- Load Google API -->
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="config.js"></script> <!-- External config file (optional) -->
-    <script>
-// === Configuration Variables (will be loaded dynamically) ===
-let CLIENT_ID = '';
-let API_KEY = '';
-const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
-
-// === Global Variables ===
-let selectedImageFiles = [];
-let googleDriveUrl = "";
-let isSignedIn = false;
-let googleAPIInitialized = false;
-
-// === DOM Elements ===
-const fileInput = document.getElementById("fileInput");
-const processBtn = document.getElementById("processBtn");
-const selectedFile = document.getElementById("selectedFile");
-const chatMessages = document.getElementById("chatMessages");
-const googleDriveUrlInput = document.getElementById("googleDriveUrl");
-const fetchDriveBtn = document.getElementById("fetchDriveBtn");
-const googleAuthBtn = document.getElementById("googleAuthBtn");
-const configStatus = document.getElementById("configStatus");
-
-// === Load Configuration ===
-async function loadConfiguration() {
-    // Try to load from localStorage first
-    const savedClientId = localStorage.getItem('GOOGLE_CLIENT_ID');
-    const savedApiKey = localStorage.getItem('GOOGLE_API_KEY');
-    
-    if (savedClientId && savedApiKey) {
-        CLIENT_ID = savedClientId;
-        API_KEY = savedApiKey;
-        document.getElementById('clientIdInput').value = CLIENT_ID;
-        document.getElementById('apiKeyInput').value = API_KEY;
-        configStatus.innerHTML = '<span style="color: green;">✅ Configuration loaded from localStorage</span>';
-        initGoogleAPI();
-        return true;
-    }
-    
-    // Try to load from external config.js file
-    if (typeof CONFIG !== 'undefined' && CONFIG.CLIENT_ID && CONFIG.API_KEY) {
-        CLIENT_ID = CONFIG.CLIENT_ID;
-        API_KEY = CONFIG.API_KEY;
-        document.getElementById('clientIdInput').value = CLIENT_ID;
-        document.getElementById('apiKeyInput').value = API_KEY;
-        configStatus.innerHTML = '<span style="color: green;">✅ Configuration loaded from config.js</span>';
-        initGoogleAPI();
-        return true;
-    }
-    
-    // Try to load from environment (for GitHub Pages with secrets)
-    try {
-        const response = await fetch('/.env.json');
-        if (response.ok) {
-            const env = await response.json();
-            if (env.GOOGLE_CLIENT_ID && env.GOOGLE_API_KEY) {
-                CLIENT_ID = env.GOOGLE_CLIENT_ID;
-                API_KEY = env.GOOGLE_API_KEY;
-                configStatus.innerHTML = '<span style="color: green;">✅ Configuration loaded from environment</span>';
-                initGoogleAPI();
-                return true;
-            }
-        }
-    } catch (e) {
-        // Environment file not available
-    }
-    
-    configStatus.innerHTML = '<span style="color: orange;">⚠️ Please enter your Google API credentials</span>';
-    return false;
-}
-
-// === Save Configuration ===
-function saveConfig() {
-    const clientId = document.getElementById('clientIdInput').value.trim();
-    const apiKey = document.getElementById('apiKeyInput').value.trim();
-    
-    if (!clientId || !apiKey) {
-        configStatus.innerHTML = '<span style="color: red;">❌ Please enter both Client ID and API Key</span>';
-        return;
-    }
-    
-    CLIENT_ID = clientId;
-    API_KEY = apiKey;
-    
-    // Save to localStorage
-    localStorage.setItem('GOOGLE_CLIENT_ID', CLIENT_ID);
-    localStorage.setItem('GOOGLE_API_KEY', API_KEY);
-    
-    configStatus.innerHTML = '<span style="color: green;">✅ Configuration saved! Initializing Google API...</span>';
-    
-    // Hide config section after saving
-    setTimeout(() => {
-        document.getElementById('configSection').style.display = 'none';
-    }, 2000);
-    
-    initGoogleAPI();
-}
-
-// === Load Config from File ===
-function loadConfigFromFile() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    <script type="module">
+        import CONFIG from './env.js';
         
-        try {
-            const text = await file.text();
-            const config = JSON.parse(text);
-            
-            if (config.CLIENT_ID && config.API_KEY) {
-                document.getElementById('clientIdInput').value = config.CLIENT_ID;
-                document.getElementById('apiKeyInput').value = config.API_KEY;
-                saveConfig();
-            } else {
-                configStatus.innerHTML = '<span style="color: red;">❌ Invalid config file format</span>';
-            }
-        } catch (error) {
-            configStatus.innerHTML = '<span style="color: red;">❌ Error reading config file</span>';
-        }
-    };
-    
-    input.click();
-}
+        // === Configuration ===
+        const CLIENT_ID = CONFIG.CLIENT_ID;
+        const API_KEY = CONFIG.API_KEY; 
+        const DISCOVERY_DOCS = CONFIG.DISCOVERY_DOCS;
+        const SCOPES = CONFIG.SCOPES;
 
-// === Google API Initialization ===
-function initGoogleAPI() {
-    if (!CLIENT_ID || !API_KEY) {
-        showMessage('⚠️ กรุณาตั้งค่า Google API Credentials ก่อน', 'error');
-        return;
-    }
-    
-    gapi.load('client:auth2', () => {
-        gapi.client.init({
-            apiKey: API_KEY,
-            clientId: CLIENT_ID,
-            discoveryDocs: DISCOVERY_DOCS,
-            scope: SCOPES
-        }).then(() => {
-            googleAPIInitialized = true;
-            
-            // Listen for sign-in state changes
-            gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
-            
-            // Handle initial sign-in state
-            updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-            
-            // Enable auth button
-            googleAuthBtn.disabled = false;
-            
-            showMessage('✅ Google API พร้อมใช้งาน', 'success');
-        }).catch(error => {
-            console.error('Error initializing Google API:', error);
-            configStatus.innerHTML = '<span style="color: red;">❌ Error: ' + error.details + '</span>';
-            showMessage('❌ ไม่สามารถเชื่อมต่อ Google API: ' + error.details, 'error');
-        });
-    });
-}
+        // === Global Variables ===
+        let selectedImageFiles = [];
+        let googleDriveUrl = "";
+        let isSignedIn = false;
 
-// === Update Sign-in Status ===
-function updateSigninStatus(signedIn) {
-    isSignedIn = signedIn;
-    if (signedIn) {
-        googleAuthBtn.textContent = '✅ เชื่อมต่อ Google แล้ว';
-        googleAuthBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
-        fetchDriveBtn.disabled = false;
-        showMessage('✅ เข้าสู่ระบบ Google สำเร็จ', 'success');
-    } else {
-        googleAuthBtn.textContent = '🔐 เข้าสู่ระบบ Google';
-        googleAuthBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #fbbc05 100%)';
-        fetchDriveBtn.disabled = true;
-    }
-}
+        // === DOM Elements ===
+        const fileInput = document.getElementById("fileInput");
+        const processBtn = document.getElementById("processBtn");
+        const selectedFile = document.getElementById("selectedFile");
+        const chatMessages = document.getElementById("chatMessages");
+        const googleDriveUrlInput = document.getElementById("googleDriveUrl");
+        const fetchDriveBtn = document.getElementById("fetchDriveBtn");
+        const googleAuthBtn = document.getElementById("googleAuthBtn");
 
-// === Google Sign-in ===
-googleAuthBtn.addEventListener('click', () => {
-    if (!googleAPIInitialized) {
-        showMessage('กรุณาตั้งค่า Google API Credentials ก่อน', 'error');
-        return;
-    }
-    
-    if (!isSignedIn) {
-        gapi.auth2.getAuthInstance().signIn();
-    } else {
-        if (confirm('ต้องการออกจากระบบ Google?')) {
-            gapi.auth2.getAuthInstance().signOut();
-        }
-    }
-});
-
-// === Fetch Images from Google Drive ===
-fetchDriveBtn.addEventListener('click', async () => {
-    const url = googleDriveUrlInput.value.trim();
-    
-    if (!url) {
-        showMessage('กรุณาใส่ URL Google Drive Folder', 'error');
-        return;
-    }
-    
-    if (!url.includes('drive.google.com/drive/folders/')) {
-        showMessage('กรุณาใส่ URL Google Drive Folder ที่ถูกต้อง', 'error');
-        return;
-    }
-    
-    const folderId = extractFolderId(url);
-    if (!folderId) {
-        showMessage('ไม่สามารถดึง Folder ID จาก URL ได้', 'error');
-        return;
-    }
-    
-    fetchDriveBtn.disabled = true;
-    fetchDriveBtn.innerHTML = '<span class="loading-spinner"></span> กำลังดึงภาพ...';
-    
-    try {
-        const response = await gapi.client.drive.files.list({
-            q: `'${folderId}' in parents and (mimeType contains 'image/')`,
-            fields: 'files(id, name, mimeType, webContentLink, size)',
-            pageSize: 100
-        });
-        
-        const files = response.result.files;
-        
-        if (!files || files.length === 0) {
-            showMessage('ไม่พบรูปภาพใน Folder นี้', 'error');
-            fetchDriveBtn.disabled = false;
-            fetchDriveBtn.innerHTML = '📥 ดึงภาพจาก Drive';
-            return;
-        }
-        
-        showMessage(`✅ พบรูปภาพ ${files.length} ไฟล์ กำลังโหลด...`, 'success');
-        
-        const imagePromises = files.map(async (file) => {
-            try {
-                const resp = await gapi.client.drive.files.get({
-                    fileId: file.id,
-                    alt: 'media'
+        // === Google API Initialization ===
+        function initGoogleAPI() {
+            gapi.load('client:auth2', () => {
+                gapi.client.init({
+                    apiKey: API_KEY,
+                    clientId: CLIENT_ID,
+                    discoveryDocs: DISCOVERY_DOCS,
+                    scope: SCOPES
+                }).then(() => {
+                    // Listen for sign-in state changes
+                    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                    
+                    // Handle initial sign-in state
+                    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+                }).catch(error => {
+                    console.error('Error initializing Google API:', error);
+                    showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ใน Google Cloud Console ก่อน', 'error');
                 });
-                
-                const blob = new Blob([resp.body], { type: file.mimeType });
-                return new File([blob], file.name, { type: file.mimeType });
-            } catch (error) {
-                console.error(`Error downloading ${file.name}:`, error);
-                return null;
-            }
-        });
-        
-        const downloadedFiles = await Promise.all(imagePromises);
-        const validFiles = downloadedFiles.filter(f => f !== null);
-        
-        if (validFiles.length > 0) {
-            handleSelectedFiles(validFiles, 'drive');
-            showMessage(`✅ โหลดภาพจาก Google Drive สำเร็จ ${validFiles.length} ไฟล์`, 'success');
-        } else {
-            showMessage('ไม่สามารถโหลดรูปภาพได้', 'error');
+            });
         }
-        
-    } catch (error) {
-        console.error('Error fetching from Drive:', error);
-        showMessage(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
-    } finally {
-        fetchDriveBtn.disabled = false;
-        fetchDriveBtn.innerHTML = '📥 ดึงภาพจาก Drive';
-    }
-});
 
-// === Extract Folder ID from URL ===
-function extractFolderId(url) {
-    // Pattern 1: /folders/FOLDER_ID
-    const match1 = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
-    if (match1) return match1[1];
-    
-    // Pattern 2: id=FOLDER_ID
-    const match2 = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
-    if (match2) return match2[1];
-    
-    return null;
-}
+        // === Update Sign-in Status ===
+        function updateSigninStatus(signedIn) {
+            isSignedIn = signedIn;
+            if (signedIn) {
+                googleAuthBtn.textContent = '✅ เชื่อมต่อ Google แล้ว';
+                googleAuthBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                fetchDriveBtn.disabled = false;
+                showMessage('✅ เข้าสู่ระบบ Google สำเร็จ', 'success');
+            } else {
+                googleAuthBtn.textContent = '🔐 เข้าสู่ระบบ Google';
+                googleAuthBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #fbbc05 100%)';
+                fetchDriveBtn.disabled = true;
+            }
+        }
 
-// === Alternative: Use Proxy Server (สำหรับ Public Folders) ===
-async function fetchFromPublicDrive(url) {
-    // สร้าง proxy server เพื่อดึงภาพจาก public folder
-    const proxyUrl = 'YOUR_PROXY_SERVER/fetch-drive';
-    
-    try {
-        const response = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folderUrl: url })
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch from proxy');
-        
-        const data = await response.json();
-        
-        // Convert image URLs to Files
-        const filePromises = data.images.map(async (imgData) => {
-            const response = await fetch(imgData.url);
-            const blob = await response.blob();
-            return new File([blob], imgData.name, { type: blob.type });
-        });
-        
-        const files = await Promise.all(filePromises);
-        return files;
-        
-    } catch (error) {
-        console.error('Proxy fetch error:', error);
-        return [];
-    }
-}
-
-// === Helper: Set files after selection/paste ===
-function handleSelectedFiles(files, source = "เลือกไฟล์") {
-    const maxFiles = 100;
-    if (files.length > maxFiles) {
-        showMessage(`จำกัดการอัพโหลดสูงสุด ${maxFiles} ไฟล์`, "error");
-        files = files.slice(0, maxFiles);
-    }
-    
-    selectedImageFiles = files;
-    selectedFile.style.display = "block";
-    
-    let fileListText = "";
-    for (const file of files) {
-        const kb = Math.round(file.size / 1024);
-        const icon = source === "paste" ? "📋" : source === "drive" ? "☁️" : "📷";
-        fileListText += `${icon} ${file.name} (${kb} KB)\n`;
-    }
-    
-    selectedFile.textContent = fileListText.trim();
-    processBtn.disabled = selectedImageFiles.length === 0;
-    processBtn.textContent = `ประมวลผล ${selectedImageFiles.length} ไฟล์แบบ Parallel`;
-}
-
-// === File Input Handler ===
-fileInput.addEventListener("change", (event) => {
-    const files = Array.from(event.target.files).filter(f => f.type.startsWith("image/"));
-    if (files.length > 0) {
-        handleSelectedFiles(files, "input");
-    } else {
-        showMessage("กรุณาเลือกไฟล์รูปภาพเท่านั้น", "error");
-        processBtn.disabled = true;
-    }
-});
-
-// === Clipboard Paste Handler ===
-document.addEventListener("paste", async (e) => {
-    const dt = e.clipboardData || window.clipboardData;
-    if (!dt) return;
-
-    const files = [];
-    if (dt.items && dt.items.length) {
-        for (const item of dt.items) {
-            if (item.type && item.type.startsWith("image/")) {
-                const blob = item.getAsFile();
-                if (blob) {
-                    const ext = blob.type.split("/")[1] || "png";
-                    const file = new File([blob], `pasted_${Date.now()}.${ext}`, { type: blob.type });
-                    files.push(file);
+        // === Google Sign-in ===
+        googleAuthBtn.addEventListener('click', () => {
+            if (!isSignedIn) {
+                gapi.auth2.getAuthInstance().signIn();
+            } else {
+                // Optional: Sign out
+                if (confirm('ต้องการออกจากระบบ Google?')) {
+                    gapi.auth2.getAuthInstance().signOut();
                 }
             }
-        }
-    }
-    if (files.length > 0) {
-        handleSelectedFiles(files, "paste");
-        e.preventDefault();
-    }
-});
+        });
 
-// === Process Files ===
-processBtn.addEventListener("click", async () => {
-    if (selectedImageFiles.length === 0) return;
-
-    processBtn.disabled = true;
-    processBtn.textContent = "กำลังประมวลผล...";
-
-    const startTime = Date.now();
-    
-    // Create processing status
-    const statusDiv = createProcessingStatus(selectedImageFiles.length);
-    
-    // Process files in chunks (max 10 concurrent)
-    const maxConcurrent = 10;
-    const chunks = [];
-    for (let i = 0; i < selectedImageFiles.length; i += maxConcurrent) {
-        chunks.push(selectedImageFiles.slice(i, i + maxConcurrent));
-    }
-
-    let processedCount = 0;
-    const results = [];
-
-    for (const chunk of chunks) {
-        const chunkPromises = chunk.map(file => processSingleFile(file, statusDiv));
-        const chunkResults = await Promise.allSettled(chunkPromises);
-        
-        chunkResults.forEach((result, index) => {
-            processedCount++;
-            updateProgress(statusDiv, processedCount, selectedImageFiles.length);
+        // === Fetch Images from Google Drive ===
+        fetchDriveBtn.addEventListener('click', async () => {
+            const url = googleDriveUrlInput.value.trim();
             
-            if (result.status === 'fulfilled') {
-                results.push(result.value);
+            if (!url) {
+                showMessage('กรุณาใส่ URL Google Drive Folder', 'error');
+                return;
+            }
+            
+            if (!url.includes('drive.google.com/drive/folders/')) {
+                showMessage('กรุณาใส่ URL Google Drive Folder ที่ถูกต้อง', 'error');
+                return;
+            }
+            
+            // Extract folder ID from URL
+            const folderId = extractFolderId(url);
+            if (!folderId) {
+                showMessage('ไม่สามารถดึง Folder ID จาก URL ได้', 'error');
+                return;
+            }
+            
+            fetchDriveBtn.disabled = true;
+            fetchDriveBtn.innerHTML = '<span class="loading-spinner"></span> กำลังดึงภาพ...';
+            
+            try {
+                // List files in the folder
+                const response = await gapi.client.drive.files.list({
+                    q: `'${folderId}' in parents and (mimeType contains 'image/')`,
+                    fields: 'files(id, name, mimeType, webContentLink, size)',
+                    pageSize: 100
+                });
+                
+                const files = response.result.files;
+                
+                if (!files || files.length === 0) {
+                    showMessage('ไม่พบรูปภาพใน Folder นี้', 'error');
+                    return;
+                }
+                
+                showMessage(`✅ พบรูปภาพ ${files.length} ไฟล์ กำลังโหลด...`, 'success');
+                
+                // Download images as blobs
+                const imagePromises = files.map(async (file) => {
+                    try {
+                        // Get file content
+                        const resp = await gapi.client.drive.files.get({
+                            fileId: file.id,
+                            alt: 'media'
+                        });
+                        
+                        // Convert to blob
+                        const blob = new Blob([resp.body], { type: file.mimeType });
+                        return new File([blob], file.name, { type: file.mimeType });
+                    } catch (error) {
+                        console.error(`Error downloading ${file.name}:`, error);
+                        return null;
+                    }
+                });
+                
+                const downloadedFiles = await Promise.all(imagePromises);
+                const validFiles = downloadedFiles.filter(f => f !== null);
+                
+                if (validFiles.length > 0) {
+                    handleSelectedFiles(validFiles, 'drive');
+                    showMessage(`✅ โหลดภาพจาก Google Drive สำเร็จ ${validFiles.length} ไฟล์`, 'success');
+                } else {
+                    showMessage('ไม่สามารถโหลดรูปภาพได้', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error fetching from Drive:', error);
+                showMessage(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            } finally {
+                fetchDriveBtn.disabled = false;
+                fetchDriveBtn.innerHTML = '📥 ดึงภาพจาก Drive';
             }
         });
-    }
 
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-    // Show summary
-    createSummaryMessage(results, duration);
-    
-    // Hide processing status
-    statusDiv.style.display = 'none';
-    
-    processBtn.disabled = false;
-    processBtn.textContent = "ประมวลผลแบบ Parallel";
-});
-
-// === Process Single File ===
-async function processSingleFile(file, statusDiv) {
-    const startTime = Date.now();
-    const taskId = `task_${file.name}_${Date.now()}`;
-    
-    updateTaskStatus(statusDiv, taskId, file.name, 'processing');
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-        const res = await fetch("https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1", {
-            method: "POST",
-            body: formData
-        });
-
-        const ct = res.headers.get("content-type") || "";
-        let data;
-        if (ct.includes("application/json")) {
-            data = await res.json();
-        } else {
-            const txt = await res.text();
-            try { data = JSON.parse(txt); } catch { data = txt; }
+        // === Extract Folder ID from URL ===
+        function extractFolderId(url) {
+            // Pattern 1: /folders/FOLDER_ID
+            const match1 = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+            if (match1) return match1[1];
+            
+            // Pattern 2: id=FOLDER_ID
+            const match2 = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+            if (match2) return match2[1];
+            
+            return null;
         }
 
-        const payload = Array.isArray(data) ? data[0] : data;
-        if (!payload || typeof payload !== "object") {
-            throw new Error("รูปแบบข้อมูลตอบกลับไม่ถูกต้อง");
+        // === Alternative: Use Proxy Server (สำหรับ Public Folders) ===
+        async function fetchFromPublicDrive(url) {
+            // สร้าง proxy server เพื่อดึงภาพจาก public folder
+            const proxyUrl = 'YOUR_PROXY_SERVER/fetch-drive';
+            
+            try {
+                const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folderUrl: url })
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch from proxy');
+                
+                const data = await response.json();
+                
+                // Convert image URLs to Files
+                const filePromises = data.images.map(async (imgData) => {
+                    const response = await fetch(imgData.url);
+                    const blob = await response.blob();
+                    return new File([blob], imgData.name, { type: blob.type });
+                });
+                
+                const files = await Promise.all(filePromises);
+                return files;
+                
+            } catch (error) {
+                console.error('Proxy fetch error:', error);
+                return [];
+            }
         }
 
-        updateTaskStatus(statusDiv, taskId, file.name, 'completed');
-        
-        createResultMessage(file.name, payload, {
-            startTime: new Date(startTime).toLocaleString("th-TH"),
-            endTime: new Date().toLocaleString("th-TH"),
-            duration: ((Date.now() - startTime) / 1000).toFixed(2)
+        // === Helper: Set files after selection/paste ===
+        function handleSelectedFiles(files, source = "เลือกไฟล์") {
+            const maxFiles = 100;
+            if (files.length > maxFiles) {
+                showMessage(`จำกัดการอัพโหลดสูงสุด ${maxFiles} ไฟล์`, "error");
+                files = files.slice(0, maxFiles);
+            }
+            
+            selectedImageFiles = files;
+            selectedFile.style.display = "block";
+            
+            let fileListText = "";
+            for (const file of files) {
+                const kb = Math.round(file.size / 1024);
+                const icon = source === "paste" ? "📋" : source === "drive" ? "☁️" : "📷";
+                fileListText += `${icon} ${file.name} (${kb} KB)\n`;
+            }
+            
+            selectedFile.textContent = fileListText.trim();
+            processBtn.disabled = selectedImageFiles.length === 0;
+            processBtn.textContent = `ประมวลผล ${selectedImageFiles.length} ไฟล์แบบ Parallel`;
+        }
+
+        // === File Input Handler ===
+        fileInput.addEventListener("change", (event) => {
+            const files = Array.from(event.target.files).filter(f => f.type.startsWith("image/"));
+            if (files.length > 0) {
+                handleSelectedFiles(files, "input");
+            } else {
+                showMessage("กรุณาเลือกไฟล์รูปภาพเท่านั้น", "error");
+                processBtn.disabled = true;
+            }
         });
 
-        return { success: true, fileName: file.name, data: payload };
+        // === Clipboard Paste Handler ===
+        document.addEventListener("paste", async (e) => {
+            const dt = e.clipboardData || window.clipboardData;
+            if (!dt) return;
 
-    } catch (error) {
-        updateTaskStatus(statusDiv, taskId, file.name, 'error');
-        showMessage(`❌ เกิดข้อผิดพลาดในการประมวลผล ${file.name}: ${error.message}`, 'error');
-        return { success: false, fileName: file.name, error: error.message };
-    }
-}
+            const files = [];
+            if (dt.items && dt.items.length) {
+                for (const item of dt.items) {
+                    if (item.type && item.type.startsWith("image/")) {
+                        const blob = item.getAsFile();
+                        if (blob) {
+                            const ext = blob.type.split("/")[1] || "png";
+                            const file = new File([blob], `pasted_${Date.now()}.${ext}`, { type: blob.type });
+                            files.push(file);
+                        }
+                    }
+                }
+            }
+            if (files.length > 0) {
+                handleSelectedFiles(files, "paste");
+                e.preventDefault();
+            }
+        });
 
-// === Create Processing Status ===
-function createProcessingStatus(totalFiles) {
-    const statusDiv = document.createElement("div");
-    statusDiv.className = "message bot";
-    statusDiv.innerHTML = `
-        <div class="message-content">
-            <div class="processing-status">
-                <h4>🔄 กำลังประมวลผลแบบ Parallel</h4>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                </div>
-                <div id="progressText">0 / ${totalFiles} ไฟล์</div>
-                <div class="task-list" id="taskList"></div>
-            </div>
-        </div>`;
-    
-    chatMessages.appendChild(statusDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    
-    return statusDiv;
-}
+        // === Process Files ===
+        processBtn.addEventListener("click", async () => {
+            if (selectedImageFiles.length === 0) return;
 
-// === Update Progress ===
-function updateProgress(statusDiv, processed, total) {
-    const progressFill = statusDiv.querySelector('#progressFill');
-    const progressText = statusDiv.querySelector('#progressText');
-    
-    const percentage = Math.round((processed / total) * 100);
-    progressFill.style.width = `${percentage}%`;
-    progressText.textContent = `${processed} / ${total} ไฟล์ (${percentage}%)`;
-}
+            processBtn.disabled = true;
+            processBtn.textContent = "กำลังประมวลผล...";
 
-// === Update Task Status ===
-function updateTaskStatus(statusDiv, taskId, fileName, status) {
-    const taskList = statusDiv.querySelector('#taskList');
-    let taskItem = taskList.querySelector(`[data-task-id="${taskId}"]`);
-    
-    if (!taskItem) {
-        taskItem = document.createElement('div');
-        taskItem.className = 'task-item';
-        taskItem.setAttribute('data-task-id', taskId);
-        taskList.appendChild(taskItem);
-    }
-    
-    taskItem.className = `task-item ${status}`;
-    
-    const icons = {
-        processing: '⏳',
-        completed: '✅',
-        error: '❌'
-    };
-    
-    const statusTexts = {
-        processing: 'กำลังประมวลผล...',
-        completed: 'สำเร็จ',
-        error: 'เกิดข้อผิดพลาด'
-    };
-    
-    taskItem.innerHTML = `
-        ${icons[status]} 
-        <span style="font-weight: bold;">${escapeHtml(fileName.substring(0, 15))}</span>
-        <span style="color: #666; font-size: 11px;">${statusTexts[status]}</span>
-    `;
-}
+            const startTime = Date.now();
+            
+            // Create processing status
+            const statusDiv = createProcessingStatus(selectedImageFiles.length);
+            
+            // Process files in chunks (max 10 concurrent)
+            const maxConcurrent = 10;
+            const chunks = [];
+            for (let i = 0; i < selectedImageFiles.length; i += maxConcurrent) {
+                chunks.push(selectedImageFiles.slice(i, i + maxConcurrent));
+            }
 
-// === Create Result Message ===
-function createResultMessage(fileName, payload, timeInfo) {
-    const msgDiv = document.createElement("div");
-    msgDiv.className = "message bot";
-    
-    let resultHTML = `
-        <div class="message-content">
-            <div class="results-container">
-                <div class="summary-card">
-                    <h3>📊 ผลลัพธ์จากไฟล์: ${escapeHtml(fileName)}</h3>
-                    ${timeInfo ? `
-                        <div style="font-size: 12px;">
-                            ⏱ ใช้เวลา: ${timeInfo.duration} วินาที
+            let processedCount = 0;
+            const results = [];
+
+            for (const chunk of chunks) {
+                const chunkPromises = chunk.map(file => processSingleFile(file, statusDiv));
+                const chunkResults = await Promise.allSettled(chunkPromises);
+                
+                chunkResults.forEach((result, index) => {
+                    processedCount++;
+                    updateProgress(statusDiv, processedCount, selectedImageFiles.length);
+                    
+                    if (result.status === 'fulfilled') {
+                        results.push(result.value);
+                    }
+                });
+            }
+
+            const endTime = Date.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+            // Show summary
+            createSummaryMessage(results, duration);
+            
+            // Hide processing status
+            statusDiv.style.display = 'none';
+            
+            processBtn.disabled = false;
+            processBtn.textContent = "ประมวลผลแบบ Parallel";
+        });
+
+        // === Process Single File ===
+        async function processSingleFile(file, statusDiv) {
+            const startTime = Date.now();
+            const taskId = `task_${file.name}_${Date.now()}`;
+            
+            updateTaskStatus(statusDiv, taskId, file.name, 'processing');
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch(`${CONFIG.API_ENDPOINT}/webhook/aip1`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                const ct = res.headers.get("content-type") || "";
+                let data;
+                if (ct.includes("application/json")) {
+                    data = await res.json();
+                } else {
+                    const txt = await res.text();
+                    try { data = JSON.parse(txt); } catch { data = txt; }
+                }
+
+                const payload = Array.isArray(data) ? data[0] : data;
+                if (!payload || typeof payload !== "object") {
+                    throw new Error("รูปแบบข้อมูลตอบกลับไม่ถูกต้อง");
+                }
+
+                updateTaskStatus(statusDiv, taskId, file.name, 'completed');
+                
+                createResultMessage(file.name, payload, {
+                    startTime: new Date(startTime).toLocaleString("th-TH"),
+                    endTime: new Date().toLocaleString("th-TH"),
+                    duration: ((Date.now() - startTime) / 1000).toFixed(2)
+                });
+
+                return { success: true, fileName: file.name, data: payload };
+
+            } catch (error) {
+                updateTaskStatus(statusDiv, taskId, file.name, 'error');
+                showMessage(`❌ เกิดข้อผิดพลาดในการประมวลผล ${file.name}: ${error.message}`, 'error');
+                return { success: false, fileName: file.name, error: error.message };
+            }
+        }
+
+        // === Create Processing Status ===
+        function createProcessingStatus(totalFiles) {
+            const statusDiv = document.createElement("div");
+            statusDiv.className = "message bot";
+            statusDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="processing-status">
+                        <h4>🔄 กำลังประมวลผลแบบ Parallel</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
                         </div>
-                    ` : ''}
+                        <div id="progressText">0 / ${totalFiles} ไฟล์</div>
+                        <div class="task-list" id="taskList"></div>
+                    </div>
                 </div>`;
-    
-    // Add data table
-    resultHTML += createHorizontalDataTable(payload);
-    
-    // Add export buttons
-    resultHTML += `
-        <div style="margin: 10px 0;">
-            <button class="process-btn" style="margin: 5px; padding: 8px 15px;" 
-                onclick='exportToCSV(${JSON.stringify(payload)}, "${escapeHtml(fileName)}")'>
-                📊 Export CSV
-            </button>
-            <button class="process-btn" style="margin: 5px; padding: 8px 15px;"
-                onclick='exportToJSON(${JSON.stringify(payload)}, "${escapeHtml(fileName)}")'>
-                📄 Export JSON
-            </button>
-        </div>
-    </div></div>`;
-    
-    msgDiv.innerHTML = resultHTML;
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// === Create Horizontal Data Table ===
-function createHorizontalDataTable(data) {
-    if (!data || typeof data !== 'object') return '';
-    
-    let html = '<div class="horizontal-table-container"><table class="horizontal-table">';
-    
-    // Create headers and values arrays
-    const entries = Object.entries(data);
-    
-    // Headers row
-    html += '<thead><tr>';
-    entries.forEach(([key]) => {
-        html += `<th>${escapeHtml(key)}</th>`;
-    });
-    html += '</tr></thead>';
-    
-    // Values row
-    html += '<tbody><tr>';
-    entries.forEach(([, value]) => {
-        let displayValue = value;
-        if (typeof value === 'object') {
-            displayValue = JSON.stringify(value, null, 2);
+            
+            chatMessages.appendChild(statusDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            return statusDiv;
         }
-        html += `<td title="${escapeHtml(String(displayValue))}">${escapeHtml(String(displayValue))}</td>`;
-    });
-    html += '</tr></tbody>';
-    
-    html += '</table></div>';
-    return html;
-}
 
-// === Create Summary Message ===
-function createSummaryMessage(results, duration) {
-    const successCount = results.filter(r => r.success).length;
-    const errorCount = results.filter(r => !r.success).length;
-    
-    const msgDiv = document.createElement("div");
-    msgDiv.className = "message bot";
-    msgDiv.innerHTML = `
-        <div class="message-content">
-            <div class="summary-card" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
-                <h3>📊 สรุปผลการประมวลผล</h3>
-                <div>จำนวนไฟล์ทั้งหมด: ${results.length}</div>
-                <div>✅ สำเร็จ: ${successCount} ไฟล์</div>
-                <div>❌ ล้มเหลว: ${errorCount} ไฟล์</div>
-                <div>⏱ เวลาทั้งหมด: ${duration} วินาที</div>
-                <div>⚡ ความเร็วเฉลี่ย: ${(results.length / parseFloat(duration)).toFixed(2)} ไฟล์/วินาที</div>
-            </div>
-        </div>`;
-    
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
+        // === Update Progress ===
+        function updateProgress(statusDiv, processed, total) {
+            const progressFill = statusDiv.querySelector('#progressFill');
+            const progressText = statusDiv.querySelector('#progressText');
+            
+            const percentage = Math.round((processed / total) * 100);
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `${processed} / ${total} ไฟล์ (${percentage}%)`;
+        }
 
-// === Show Message ===
-function showMessage(message, type = "info") {
-    const colors = {
-        success: "#4caf50",
-        error: "#f44336",
-        info: "#2196f3"
-    };
-    
-    const msgDiv = document.createElement("div");
-    msgDiv.className = "message bot";
-    msgDiv.innerHTML = `
-        <div class="message-content">
-            <div style="background: ${colors[type]}20; color: ${colors[type]}; 
-                padding: 12px; border-radius: 8px; border-left: 4px solid ${colors[type]}; 
-                margin: 10px 0; font-size: 13px;">
-                ${escapeHtml(message)}
-            </div>
-        </div>`;
-    
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    
-    // Auto remove after 5 seconds for non-error messages
-    if (type !== 'error') {
-        setTimeout(() => {
-            if (msgDiv.parentNode) {
-                msgDiv.remove();
+        // === Update Task Status ===
+        function updateTaskStatus(statusDiv, taskId, fileName, status) {
+            const taskList = statusDiv.querySelector('#taskList');
+            let taskItem = taskList.querySelector(`[data-task-id="${taskId}"]`);
+            
+            if (!taskItem) {
+                taskItem = document.createElement('div');
+                taskItem.className = 'task-item';
+                taskItem.setAttribute('data-task-id', taskId);
+                taskList.appendChild(taskItem);
             }
-        }, 5000);
-    }
-}
-
-// === Export Functions ===
-function exportToCSV(data, fileName) {
-    try {
-        const csvData = flattenObjectForCSV(data);
-        const headers = Object.keys(csvData);
-        const values = headers.map(h => `"${String(csvData[h] ?? "").replace(/"/g, '""')}"`);
-        
-        const csvContent = [headers.join(","), values.join(",")].join("\n");
-        downloadFile(csvContent, "text/csv", `${fileName.replace(/\.[^/.]+$/, "")}_data.csv`);
-    } catch (error) {
-        showMessage("เกิดข้อผิดพลาดในการ Export CSV", "error");
-    }
-}
-
-function exportToJSON(data, fileName) {
-    try {
-        const jsonContent = JSON.stringify(data, null, 2);
-        downloadFile(jsonContent, "application/json", `${fileName.replace(/\.[^/.]+$/, "")}_data.json`);
-    } catch (error) {
-        showMessage("เกิดข้อผิดพลาดในการ Export JSON", "error");
-    }
-}
-
-function flattenObjectForCSV(obj, prefix = '') {
-    let result = {};
-    
-    for (const [key, value] of Object.entries(obj)) {
-        const newKey = prefix ? `${prefix}_${key}` : key;
-        
-        if (Array.isArray(value)) {
-            result[newKey] = JSON.stringify(value);
-        } else if (typeof value === 'object' && value !== null) {
-            Object.assign(result, flattenObjectForCSV(value, newKey));
-        } else {
-            result[newKey] = value;
+            
+            taskItem.className = `task-item ${status}`;
+            
+            const icons = {
+                processing: '⏳',
+                completed: '✅',
+                error: '❌'
+            };
+            
+            const statusTexts = {
+                processing: 'กำลังประมวลผล...',
+                completed: 'สำเร็จ',
+                error: 'เกิดข้อผิดพลาด'
+            };
+            
+            taskItem.innerHTML = `
+                ${icons[status]} 
+                <span style="font-weight: bold;">${escapeHtml(fileName.substring(0, 15))}</span>
+                <span style="color: #666; font-size: 11px;">${statusTexts[status]}</span>
+            `;
         }
-    }
-    
-    return result;
-}
 
-function downloadFile(content, mimeType, fileName) {
-    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// === Utility: Escape HTML ===
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
-
-function createTotalSummaryMessage(info) {
-    const resultHTML = `
-        <div class="message-content">
-            <div class="summary-card" style="background: linear-gradient(135deg,#ff512f 0%,#dd2476 100%);">
-                <h3>📊 สรุปผลการประมวลผลแบบ Parallel</h3>
-                <div>✅ จำนวนไฟล์ทั้งหมด: ${info.fileCount} ไฟล์</div>
-                <div>🎯 ประมวลผลสำเร็จ: ${info.successCount} ไฟล์</div>
-                <div>❌ เกิดข้อผิดพลาด: ${info.errorCount} ไฟล์</div>
-                ${info.googleDriveUrl ? `<div>🔗 Google Drive: เชื่อมต่อแล้ว</div>` : ''}
-                <div style="margin-top:8px; font-size:13px; text-align:left;">
-                    🟢 เริ่มทั้งหมด: ${escapeHtml(info.startDateAll)}<br>
-                    🔴 จบทั้งหมด: ${escapeHtml(info.endDateAll)}<br>
-                    ⏱ ใช้เวลารวม: ${escapeHtml(info.durationAllSec)} วินาที (~${escapeHtml(info.durationAllMin)} นาที)<br>
-                    ⚡ ความเร็วเฉลี่ย: ${(info.fileCount / parseFloat(info.durationAllSec)).toFixed(2)} ไฟล์/วินาที
+        // === Create Result Message ===
+        function createResultMessage(fileName, payload, timeInfo) {
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "message bot";
+            
+            let resultHTML = `
+                <div class="message-content">
+                    <div class="results-container">
+                        <div class="summary-card">
+                            <h3>📊 ผลลัพธ์จากไฟล์: ${escapeHtml(fileName)}</h3>
+                            ${timeInfo ? `
+                                <div style="font-size: 12px;">
+                                    ⏱ ใช้เวลา: ${timeInfo.duration} วินาที
+                                </div>
+                            ` : ''}
+                        </div>`;
+            
+            // Add data table
+            resultHTML += createHorizontalDataTable(payload);
+            
+            // Add export buttons
+            resultHTML += `
+                <div style="margin: 10px 0;">
+                    <button class="process-btn" style="margin: 5px; padding: 8px 15px;" 
+                        onclick='exportToCSV(${JSON.stringify(payload)}, "${escapeHtml(fileName)}")'>
+                        📊 Export CSV
+                    </button>
+                    <button class="process-btn" style="margin: 5px; padding: 8px 15px;"
+                        onclick='exportToJSON(${JSON.stringify(payload)}, "${escapeHtml(fileName)}")'>
+                        📄 Export JSON
+                    </button>
                 </div>
-            </div>
-        </div>`;
+            </div></div>`;
+            
+            msgDiv.innerHTML = resultHTML;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
-    const msgDiv = document.createElement("div");
-    msgDiv.className = "message bot";
-    msgDiv.innerHTML = resultHTML;
+        // === Create Horizontal Data Table ===
+        function createHorizontalDataTable(data) {
+            if (!data || typeof data !== 'object') return '';
+            
+            let html = '<div class="horizontal-table-container"><table class="horizontal-table">';
+            
+            // Create headers and values arrays
+            const entries = Object.entries(data);
+            
+            // Headers row
+            html += '<thead><tr>';
+            entries.forEach(([key]) => {
+                html += `<th>${escapeHtml(key)}</th>`;
+            });
+            html += '</tr></thead>';
+            
+            // Values row
+            html += '<tbody><tr>';
+            entries.forEach(([, value]) => {
+                let displayValue = value;
+                if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value, null, 2);
+                }
+                html += `<td title="${escapeHtml(String(displayValue))}">${escapeHtml(String(displayValue))}</td>`;
+            });
+            html += '</tr></tbody>';
+            
+            html += '</table></div>';
+            return html;
+        }
 
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
+        // === Create Summary Message ===
+        function createSummaryMessage(results, duration) {
+            const successCount = results.filter(r => r.success).length;
+            const errorCount = results.filter(r => !r.success).length;
+            
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "message bot";
+            msgDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="summary-card" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">
+                        <h3>📊 สรุปผลการประมวลผล</h3>
+                        <div>จำนวนไฟล์ทั้งหมด: ${results.length}</div>
+                        <div>✅ สำเร็จ: ${successCount} ไฟล์</div>
+                        <div>❌ ล้มเหลว: ${errorCount} ไฟล์</div>
+                        <div>⏱ เวลาทั้งหมด: ${duration} วินาที</div>
+                        <div>⚡ ความเร็วเฉลี่ย: ${(results.length / parseFloat(duration)).toFixed(2)} ไฟล์/วินาที</div>
+                    </div>
+                </div>`;
+            
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
+        // === Show Message ===
+        function showMessage(message, type = "info") {
+            const colors = {
+                success: "#4caf50",
+                error: "#f44336",
+                info: "#2196f3"
+            };
+            
+            const msgDiv = document.createElement("div");
+            msgDiv.className = "message bot";
+            msgDiv.innerHTML = `
+                <div class="message-content">
+                    <div style="background: ${colors[type]}20; color: ${colors[type]}; 
+                        padding: 12px; border-radius: 8px; border-left: 4px solid ${colors[type]}; 
+                        margin: 10px 0; font-size: 13px;">
+                        ${escapeHtml(message)}
+                    </div>
+                </div>`;
+            
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Auto remove after 5 seconds for non-error messages
+            if (type !== 'error') {
+                setTimeout(() => {
+                    if (msgDiv.parentNode) {
+                        msgDiv.remove();
+                    }
+                }, 5000);
+            }
+        }
+
+        // === Export Functions ===
+        function exportToCSV(data, fileName) {
+            try {
+                const csvData = flattenObjectForCSV(data);
+                const headers = Object.keys(csvData);
+                const values = headers.map(h => `"${String(csvData[h] ?? "").replace(/"/g, '""')}"`);
+                
+                const csvContent = [headers.join(","), values.join(",")].join("\n");
+                downloadFile(csvContent, "text/csv", `${fileName.replace(/\.[^/.]+$/, "")}_data.csv`);
+            } catch (error) {
+                showMessage("เกิดข้อผิดพลาดในการ Export CSV", "error");
+            }
+        }
+
+        function exportToJSON(data, fileName) {
+            try {
+                const jsonContent = JSON.stringify(data, null, 2);
+                downloadFile(jsonContent, "application/json", `${fileName.replace(/\.[^/.]+$/, "")}_data.json`);
+            } catch (error) {
+                showMessage("เกิดข้อผิดพลาดในการ Export JSON", "error");
+            }
+        }
+
+        function flattenObjectForCSV(obj, prefix = '') {
+            let result = {};
+            
+            for (const [key, value] of Object.entries(obj)) {
+                const newKey = prefix ? `${prefix}_${key}` : key;
+                
+                if (Array.isArray(value)) {
+                    result[newKey] = JSON.stringify(value);
+                } else if (typeof value === 'object' && value !== null) {
+                    Object.assign(result, flattenObjectForCSV(value, newKey));
+                } else {
+                    result[newKey] = value;
+                }
+            }
+            
+            return result;
+        }
+
+        function downloadFile(content, mimeType, fileName) {
+            const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // === Utility: Escape HTML ===
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        // === Initialize Google API on Load ===
+        window.onload = function() {
+            // Check if API Key and Client ID are configured
+            if (!CLIENT_ID || !API_KEY) {
+                showMessage('⚠️ Missing Google API configuration', 'error');
+                
+                // Disable Google Drive buttons
+                googleAuthBtn.disabled = true;
+                fetchDriveBtn.disabled = true;
+                googleAuthBtn.textContent = '⚠️ API Configuration Missing';
+            } else {
+                // Initialize Google API
+                initGoogleAPI();
+            }
+        };
     </script>
 </body>
 </html>
