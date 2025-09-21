@@ -425,6 +425,40 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .config-section {
+            padding: 12px;
+            background: #ffeaa7;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #fdcb6e;
+        }
+
+        .config-input {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 5px;
+            width: 300px;
+        }
+
+        .config-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            margin: 5px;
+        }
+
+        .config-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 184, 148, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -439,19 +473,35 @@
                 <div class="message-content">
                     <strong>🎯 ยินดีต้อนรับสู่ Enhanced Bill Calculator!</strong><br><br>
                     
-                    📋 <strong>ฟีเจอร์ใหม่:</strong><br>
+                    📋 <strong>ฟีเจอร์:</strong><br>
                     • 🔗 ดึงภาพจาก Google Drive โดยตรง<br>
                     • ⚡ ประมวลผลแบบ Parallel Processing<br>
                     • 📊 Real-time Progress Tracking<br><br>
                     
-                    📋 <strong>วิธีใช้งาน:</strong><br>
-                    1. กดปุ่ม "เข้าสู่ระบบ Google" เพื่ออนุญาตการเข้าถึง<br>
-                    2. ใส่ URL Google Drive Folder ที่แชร์แล้ว<br>
-                    3. กดปุ่ม "ดึงภาพจาก Drive"<br>
-                    4. หรืออัพโหลดรูปภาพบิลโดยตรง<br>
-                    5. กดปุ่ม "ประมวลผลแบบ Parallel"<br><br>
+                    ⚠️ <strong>การตั้งค่า Google API:</strong><br>
+                    1. กรอก Client ID และ API Key ด้านล่าง<br>
+                    2. หรือโหลดจาก config.json<br>
+                    3. จากนั้นจึงจะใช้งาน Google Drive ได้<br><br>
                     
-                    💡 <strong>รองรับ:</strong> JPG, PNG, WebP
+                    💡 <strong>รองรับ:</strong> JPG, PNG, WebP (สูงสุด 100 ไฟล์)
+                </div>
+            </div>
+            
+            <!-- Configuration Section -->
+            <div class="message bot">
+                <div class="message-content">
+                    <div class="config-section" id="configSection">
+                        <strong>⚙️ ตั้งค่า Google API Credentials:</strong><br>
+                        <small>สร้างได้จาก <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></small><br><br>
+                        
+                        <input type="text" id="clientIdInput" class="config-input" placeholder="Client ID (xxx.apps.googleusercontent.com)">
+                        <input type="password" id="apiKeyInput" class="config-input" placeholder="API Key"><br>
+                        
+                        <button class="config-btn" onclick="saveConfig()">💾 บันทึกการตั้งค่า</button>
+                        <button class="config-btn" onclick="loadConfigFromFile()">📁 โหลดจาก config.json</button>
+                        
+                        <div id="configStatus" style="margin-top: 10px; font-size: 12px;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -468,7 +518,7 @@
                         placeholder="https://drive.google.com/drive/folders/..."
                         value=""
                     >
-                    <button class="google-auth-btn" id="googleAuthBtn">
+                    <button class="google-auth-btn" id="googleAuthBtn" disabled>
                         🔐 เข้าสู่ระบบ Google
                     </button>
                     <button class="sheets-btn" id="fetchDriveBtn" disabled>
@@ -498,23 +548,13 @@
         </div>
     </div>
 
-    <button id="googleAuthBtn">🔐 เข้าสู่ระบบ Google</button>
-  <button id="fetchDriveBtn" disabled>📄 ดึงรายชื่อไฟล์จาก Google Drive</button>
-
-  <pre id="output"></pre>
-
-  <!-- Google API -->
-  <script src="https://apis.google.com/js/api.js"></script>
-  <!-- Configuration -->
-  <script src="env.js"></script>
-<script>
-  const CLIENT_ID = window.ENV.GOOGLE_CLIENT_ID;
-  const API_KEY = window.ENV.GOOGLE_API_KEY;
-</script>
-
-
+    <!-- Load Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="config.js"></script> <!-- External config file (optional) -->
     <script>
-// === Configuration ===
+// === Configuration Variables (will be loaded dynamically) ===
+let CLIENT_ID = '';
+let API_KEY = '';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
@@ -522,6 +562,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 let selectedImageFiles = [];
 let googleDriveUrl = "";
 let isSignedIn = false;
+let googleAPIInitialized = false;
 
 // === DOM Elements ===
 const fileInput = document.getElementById("fileInput");
@@ -531,9 +572,119 @@ const chatMessages = document.getElementById("chatMessages");
 const googleDriveUrlInput = document.getElementById("googleDriveUrl");
 const fetchDriveBtn = document.getElementById("fetchDriveBtn");
 const googleAuthBtn = document.getElementById("googleAuthBtn");
+const configStatus = document.getElementById("configStatus");
+
+// === Load Configuration ===
+async function loadConfiguration() {
+    // Try to load from localStorage first
+    const savedClientId = localStorage.getItem('GOOGLE_CLIENT_ID');
+    const savedApiKey = localStorage.getItem('GOOGLE_API_KEY');
+    
+    if (savedClientId && savedApiKey) {
+        CLIENT_ID = savedClientId;
+        API_KEY = savedApiKey;
+        document.getElementById('clientIdInput').value = CLIENT_ID;
+        document.getElementById('apiKeyInput').value = API_KEY;
+        configStatus.innerHTML = '<span style="color: green;">✅ Configuration loaded from localStorage</span>';
+        initGoogleAPI();
+        return true;
+    }
+    
+    // Try to load from external config.js file
+    if (typeof CONFIG !== 'undefined' && CONFIG.CLIENT_ID && CONFIG.API_KEY) {
+        CLIENT_ID = CONFIG.CLIENT_ID;
+        API_KEY = CONFIG.API_KEY;
+        document.getElementById('clientIdInput').value = CLIENT_ID;
+        document.getElementById('apiKeyInput').value = API_KEY;
+        configStatus.innerHTML = '<span style="color: green;">✅ Configuration loaded from config.js</span>';
+        initGoogleAPI();
+        return true;
+    }
+    
+    // Try to load from environment (for GitHub Pages with secrets)
+    try {
+        const response = await fetch('/.env.json');
+        if (response.ok) {
+            const env = await response.json();
+            if (env.GOOGLE_CLIENT_ID && env.GOOGLE_API_KEY) {
+                CLIENT_ID = env.GOOGLE_CLIENT_ID;
+                API_KEY = env.GOOGLE_API_KEY;
+                configStatus.innerHTML = '<span style="color: green;">✅ Configuration loaded from environment</span>';
+                initGoogleAPI();
+                return true;
+            }
+        }
+    } catch (e) {
+        // Environment file not available
+    }
+    
+    configStatus.innerHTML = '<span style="color: orange;">⚠️ Please enter your Google API credentials</span>';
+    return false;
+}
+
+// === Save Configuration ===
+function saveConfig() {
+    const clientId = document.getElementById('clientIdInput').value.trim();
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    
+    if (!clientId || !apiKey) {
+        configStatus.innerHTML = '<span style="color: red;">❌ Please enter both Client ID and API Key</span>';
+        return;
+    }
+    
+    CLIENT_ID = clientId;
+    API_KEY = apiKey;
+    
+    // Save to localStorage
+    localStorage.setItem('GOOGLE_CLIENT_ID', CLIENT_ID);
+    localStorage.setItem('GOOGLE_API_KEY', API_KEY);
+    
+    configStatus.innerHTML = '<span style="color: green;">✅ Configuration saved! Initializing Google API...</span>';
+    
+    // Hide config section after saving
+    setTimeout(() => {
+        document.getElementById('configSection').style.display = 'none';
+    }, 2000);
+    
+    initGoogleAPI();
+}
+
+// === Load Config from File ===
+function loadConfigFromFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+            const text = await file.text();
+            const config = JSON.parse(text);
+            
+            if (config.CLIENT_ID && config.API_KEY) {
+                document.getElementById('clientIdInput').value = config.CLIENT_ID;
+                document.getElementById('apiKeyInput').value = config.API_KEY;
+                saveConfig();
+            } else {
+                configStatus.innerHTML = '<span style="color: red;">❌ Invalid config file format</span>';
+            }
+        } catch (error) {
+            configStatus.innerHTML = '<span style="color: red;">❌ Error reading config file</span>';
+        }
+    };
+    
+    input.click();
+}
 
 // === Google API Initialization ===
 function initGoogleAPI() {
+    if (!CLIENT_ID || !API_KEY) {
+        showMessage('⚠️ กรุณาตั้งค่า Google API Credentials ก่อน', 'error');
+        return;
+    }
+    
     gapi.load('client:auth2', () => {
         gapi.client.init({
             apiKey: API_KEY,
@@ -541,14 +692,22 @@ function initGoogleAPI() {
             discoveryDocs: DISCOVERY_DOCS,
             scope: SCOPES
         }).then(() => {
+            googleAPIInitialized = true;
+            
             // Listen for sign-in state changes
             gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
             
             // Handle initial sign-in state
             updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+            
+            // Enable auth button
+            googleAuthBtn.disabled = false;
+            
+            showMessage('✅ Google API พร้อมใช้งาน', 'success');
         }).catch(error => {
             console.error('Error initializing Google API:', error);
-            showMessage('⚠️ กรุณาตั้งค่า CLIENT_ID และ API_KEY ใน Google Cloud Console ก่อน', 'error');
+            configStatus.innerHTML = '<span style="color: red;">❌ Error: ' + error.details + '</span>';
+            showMessage('❌ ไม่สามารถเชื่อมต่อ Google API: ' + error.details, 'error');
         });
     });
 }
@@ -570,10 +729,14 @@ function updateSigninStatus(signedIn) {
 
 // === Google Sign-in ===
 googleAuthBtn.addEventListener('click', () => {
+    if (!googleAPIInitialized) {
+        showMessage('กรุณาตั้งค่า Google API Credentials ก่อน', 'error');
+        return;
+    }
+    
     if (!isSignedIn) {
         gapi.auth2.getAuthInstance().signIn();
     } else {
-        // Optional: Sign out
         if (confirm('ต้องการออกจากระบบ Google?')) {
             gapi.auth2.getAuthInstance().signOut();
         }
@@ -594,7 +757,6 @@ fetchDriveBtn.addEventListener('click', async () => {
         return;
     }
     
-    // Extract folder ID from URL
     const folderId = extractFolderId(url);
     if (!folderId) {
         showMessage('ไม่สามารถดึง Folder ID จาก URL ได้', 'error');
@@ -605,7 +767,6 @@ fetchDriveBtn.addEventListener('click', async () => {
     fetchDriveBtn.innerHTML = '<span class="loading-spinner"></span> กำลังดึงภาพ...';
     
     try {
-        // List files in the folder
         const response = await gapi.client.drive.files.list({
             q: `'${folderId}' in parents and (mimeType contains 'image/')`,
             fields: 'files(id, name, mimeType, webContentLink, size)',
@@ -616,21 +777,20 @@ fetchDriveBtn.addEventListener('click', async () => {
         
         if (!files || files.length === 0) {
             showMessage('ไม่พบรูปภาพใน Folder นี้', 'error');
+            fetchDriveBtn.disabled = false;
+            fetchDriveBtn.innerHTML = '📥 ดึงภาพจาก Drive';
             return;
         }
         
         showMessage(`✅ พบรูปภาพ ${files.length} ไฟล์ กำลังโหลด...`, 'success');
         
-        // Download images as blobs
         const imagePromises = files.map(async (file) => {
             try {
-                // Get file content
                 const resp = await gapi.client.drive.files.get({
                     fileId: file.id,
                     alt: 'media'
                 });
                 
-                // Convert to blob
                 const blob = new Blob([resp.body], { type: file.mimeType });
                 return new File([blob], file.name, { type: file.mimeType });
             } catch (error) {
