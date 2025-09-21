@@ -832,7 +832,10 @@
             formData.append("file", file);
 
             try {
-                const res = await fetch(`${CONFIG.API_ENDPOINT}/webhook/aip1`, {
+                // Normalize API endpoint (avoid double slashes, allow empty => use relative)
+                const apiBase = (CONFIG.API_ENDPOINT || "").replace(/\/+$/g, "");
+                const endpoint = apiBase ? `${apiBase}/webhook/aip1` : `/webhook/aip1`;
+                const res = await fetch(endpoint, {
                     method: "POST",
                     body: formData
                 });
