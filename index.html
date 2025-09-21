@@ -1,559 +1,65 @@
 <!DOCTYPE html>
-<html lang="th">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Bill Calculator - OAuth Only</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-            border-radius: 15px;
-        }
-        .section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            background: #f9f9f9;
-        }
-        .btn {
-            padding: 12px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-        }
-        .btn-google {
-            background: linear-gradient(135deg, #ea4335 0%, #fbbc05 100%);
-            color: white;
-        }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        .input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-size: 14px;
-        }
-        .debug-log {
-            background: #000;
-            color: #0f0;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .status {
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
-        .status.success { background: #e8f5e8; color: #2e7d32; border-left: 4px solid #4caf50; }
-        .status.error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
-        .status.warning { background: #fff3e0; color: #f57c00; border-left: 4px solid #ff9800; }
-        .status.info { background: #e3f2fd; color: #1565c0; border-left: 4px solid #2196f3; }
-    </style>
+    <title>OAuth Test - Alternative Method</title>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🧾 Enhanced Bill Calculator - OAuth Only</h1>
-            <p>ใช้ OAuth เท่านั้น ไม่ต้อง API Key</p>
-        </div>
+    <h1>OAuth Test - Alternative Method</h1>
+    <div id="status">Loading...</div>
+    <button id="testBtn" disabled>Test Direct OAuth</button>
+    <div id="output"></div>
 
-        <!-- Configuration Status -->
-        <div class="section">
-            <h3>📊 Configuration Status</h3>
-            <div id="configStatus">กำลังตรวจสอบ...</div>
-        </div>
-
-        <!-- Google API Status -->
-        <div class="section">
-            <h3>🔑 Google OAuth Status</h3>
-            <button class="btn btn-google" id="testGoogleApiBtn">🧪 Test OAuth Setup</button>
-            <button class="btn btn-google" id="googleAuthBtn" disabled>🔐 เข้าสู่ระบบ Google</button>
-            <div id="googleApiStatus" class="status info">รอการทดสอบ...</div>
-        </div>
-
-        <!-- Google Drive Integration -->
-        <div class="section">
-            <h3>☁️ Google Drive Integration</h3>
-            <input type="url" id="googleDriveUrl" class="input" 
-                placeholder="https://drive.google.com/drive/folders/..." 
-                value="https://drive.google.com/drive/folders/1sSJdactN9akdC4cC93y9KuspmsaykDZh?usp=drive_link">
-            <button class="btn btn-primary" id="fetchDriveBtn" disabled>📥 ดึงภาพจาก Drive</button>
-            <div id="driveStatus" class="status info">รอการเชื่อมต่อ...</div>
-        </div>
-
-        <!-- File Upload (Alternative) -->
-        <div class="section">
-            <h3>📁 File Upload (Alternative)</h3>
-            <input type="file" id="fileInput" class="input" accept="image/*" multiple>
-            <button class="btn btn-primary" id="processBtn" disabled>⚡ ประมวลผลไฟล์</button>
-        </div>
-
-        <!-- Debug Log -->
-        <div class="section">
-            <h3>🔍 Debug Log</h3>
-            <button class="btn" onclick="clearDebugLog()">🧹 Clear Log</button>
-            <div id="debugLog" class="debug-log">กำลังเริ่มระบบ...\n</div>
-        </div>
-    </div>
-
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script type="module">
-        // === OAuth-Only Configuration ===
-        let CONFIG = {
-            CLIENT_ID: "171730649633-qaa4lhi484g7srrbot6p394jq7an35h7.apps.googleusercontent.com",
-            DISCOVERY_DOCS: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
-            SCOPES: "https://www.googleapis.com/auth/drive.readonly"
-        };
-
-        // === Global Variables ===
-        let isGapiLoaded = false;
-        let isSignedIn = false;
-        let selectedFiles = [];
-
-        // === DOM Elements ===
-        const configStatus = document.getElementById('configStatus');
-        const testGoogleApiBtn = document.getElementById('testGoogleApiBtn');
-        const googleAuthBtn = document.getElementById('googleAuthBtn');
-        const googleApiStatus = document.getElementById('googleApiStatus');
-        const googleDriveUrl = document.getElementById('googleDriveUrl');
-        const fetchDriveBtn = document.getElementById('fetchDriveBtn');
-        const driveStatus = document.getElementById('driveStatus');
-        const fileInput = document.getElementById('fileInput');
-        const processBtn = document.getElementById('processBtn');
-        const debugLog = document.getElementById('debugLog');
-
-        // === Debug Functions ===
-        function log(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const logMessage = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
-            debugLog.textContent += logMessage;
-            debugLog.scrollTop = debugLog.scrollHeight;
-            console.log(logMessage);
+    <script>
+        // ลองใช้ Google Identity Services (ใหม่กว่า)
+        function loadGoogleIdentity() {
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.onload = initializeGoogleIdentity;
+            script.onerror = () => {
+                document.getElementById('status').textContent = 'Failed to load Google Identity Services';
+            };
+            document.head.appendChild(script);
         }
 
-        function setStatus(element, message, type = 'info') {
-            element.className = `status ${type}`;
-            element.textContent = message;
-            log(`Status Update (${element.id}): ${message}`, type);
-        }
+        function initializeGoogleIdentity() {
+            const CLIENT_ID = "171730649633-qaa4lhi484g7srrbot6p394jq7an35h7.apps.googleusercontent.com";
+            
+            window.google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                callback: handleCredentialResponse
+            });
 
-        function clearDebugLog() {
-            debugLog.textContent = 'Debug log cleared.\n';
-        }
-
-        // === Check Configuration ===
-        function checkConfiguration() {
-            log('Checking OAuth-only configuration...');
+            document.getElementById('status').textContent = 'Google Identity Services loaded successfully';
+            document.getElementById('testBtn').disabled = false;
             
-            const issues = [];
-            
-            if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.includes('YOUR_') || CONFIG.CLIENT_ID.includes('${{')) {
-                issues.push('CLIENT_ID ไม่ได้ตั้งค่า');
-            }
-            
-            if (issues.length > 0) {
-                setStatus(configStatus, `❌ Configuration ไม่ครบ: ${issues.join(', ')}`, 'error');
-                log('Configuration issues found: ' + issues.join(', '), 'error');
-                return false;
-            } else {
-                setStatus(configStatus, '✅ OAuth Configuration ครบถ้วน (ไม่ต้อง API Key)', 'success');
-                log('OAuth Configuration OK - no API Key needed', 'success');
-                return true;
-            }
-        }
-
-        // === Test Google OAuth Setup ===
-        testGoogleApiBtn.addEventListener('click', async () => {
-            testGoogleApiBtn.disabled = true;
-            testGoogleApiBtn.textContent = '🔄 กำลังทดสอบ...';
-            
-            log('Testing Google OAuth setup...');
-            
-            try {
-                if (!window.gapi) {
-                    throw new Error('gapi not loaded');
+            // ลองแสดง sign-in button
+            window.google.accounts.id.renderButton(
+                document.getElementById('testBtn'),
+                { 
+                    theme: "outline", 
+                    size: "large",
+                    text: "signin_with",
+                    shape: "rectangular"
                 }
-                
-                log('gapi object found');
-                setStatus(googleApiStatus, '✅ Google API Script โหลดสำเร็จ', 'success');
-                
-                // Load auth2 only (no client needed for OAuth-only approach)
-                await new Promise((resolve, reject) => {
-                    log('Loading gapi auth2...');
-                    gapi.load('auth2', {
-                        callback: resolve,
-                        onerror: (err) => {
-                            console.error('gapi.load error', err);
-                            reject(new Error('Failed to load gapi auth2'));
-                        }
-                    });
-                });
-                
-                log('gapi auth2 loaded successfully');
-                
-                // Initialize auth2 only
-                const authInstance = await gapi.auth2.init({
-                    client_id: CONFIG.CLIENT_ID,
-                    scope: CONFIG.SCOPES
-                });
-                
-                log('gapi.auth2.init completed');
-                
-                if (authInstance) {
-                    log('Auth instance created successfully');
-                    setStatus(googleApiStatus, '✅ Google OAuth พร้อมใช้งาน', 'success');
-                    
-                    googleAuthBtn.disabled = false;
-                    isGapiLoaded = true;
-                    
-                    // Listen for sign-in state changes
-                    authInstance.isSignedIn.listen(updateSigninStatus);
-                    updateSigninStatus(authInstance.isSignedIn.get());
-                    
-                } else {
-                    throw new Error('Failed to get auth instance');
-                }
-                
-            } catch (error) {
-                console.error("Full OAuth error object:", error); 
-                const errorMessage = error?.result?.error?.message || error?.message || 'Unknown OAuth error';
-                log(`Google OAuth test failed: ${errorMessage}`, 'error');
-                setStatus(googleApiStatus, `❌ ล้มเหลว: ${errorMessage}`, 'error');
-            } finally {
-                testGoogleApiBtn.disabled = false;
-                testGoogleApiBtn.textContent = '🧪 Test OAuth Setup';
-            }
+            );
+        }
+
+        function handleCredentialResponse(response) {
+            document.getElementById('output').innerHTML = `
+                <h3>Success!</h3>
+                <p>JWT Token received (first 50 chars): ${response.credential.substring(0, 50)}...</p>
+                <p>This means OAuth is working correctly.</p>
+            `;
+        }
+
+        document.getElementById('testBtn').addEventListener('click', () => {
+            // ลอง prompt sign-in
+            window.google.accounts.id.prompt();
         });
 
-        // === Google Sign-in ===
-        googleAuthBtn.addEventListener('click', async () => {
-            if (!isGapiLoaded) {
-                setStatus(googleApiStatus, '❌ Google OAuth ยังไม่พร้อม กรุณาทดสอบก่อน', 'error');
-                return;
-            }
-            
-            try {
-                const authInstance = gapi.auth2.getAuthInstance();
-                
-                if (!isSignedIn) {
-                    log('Attempting to sign in...');
-                    await authInstance.signIn();
-                } else {
-                    log('Attempting to sign out...');
-                    await authInstance.signOut();
-                }
-                
-            } catch (error) {
-                log(`Sign-in/out error: ${error.message}`, 'error');
-                setStatus(googleApiStatus, `❌ Sign-in error: ${error.message}`, 'error');
-            }
-        });
-
-        // === Update Sign-in Status ===
-        function updateSigninStatus(signedIn) {
-            isSignedIn = signedIn;
-            log(`Sign-in status changed: ${signedIn}`);
-            
-            if (signedIn) {
-                googleAuthBtn.textContent = '✅ ออกจากระบบ';
-                googleAuthBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
-                
-                // Initialize Drive API client after successful sign-in
-                initializeDriveAPI();
-                
-                setStatus(googleApiStatus, '✅ เข้าสู่ระบบ Google สำเร็จ', 'success');
-                
-                // Get user info
-                const user = gapi.auth2.getAuthInstance().currentUser.get();
-                const profile = user.getBasicProfile();
-                log(`Signed in as: ${profile.getName()} (${profile.getEmail()})`);
-                
-            } else {
-                googleAuthBtn.textContent = '🔐 เข้าสู่ระบบ Google';
-                googleAuthBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #fbbc05 100%)';
-                fetchDriveBtn.disabled = true;
-                setStatus(googleApiStatus, '⏳ ยังไม่ได้เข้าสู่ระบบ', 'warning');
-            }
-        }
-
-        // === Initialize Drive API Client After Sign-in ===
-        async function initializeDriveAPI() {
-            try {
-                log('Initializing Drive API client...');
-                
-                // Load gapi client
-                await new Promise((resolve, reject) => {
-                    gapi.load('client', {
-                        callback: resolve,
-                        onerror: reject
-                    });
-                });
-                
-                // Initialize client with minimal config (no API key needed with OAuth)
-                await gapi.client.init({
-                    discoveryDocs: CONFIG.DISCOVERY_DOCS
-                });
-                
-                log('Drive API client initialized successfully');
-                fetchDriveBtn.disabled = false;
-                
-            } catch (error) {
-                log(`Failed to initialize Drive API: ${error.message}`, 'error');
-                setStatus(googleApiStatus, `❌ Drive API init failed: ${error.message}`, 'error');
-            }
-        }
-
-        // === Fetch from Google Drive ===
-        fetchDriveBtn.addEventListener('click', async () => {
-            const url = googleDriveUrl.value.trim();
-            
-            if (!url) {
-                setStatus(driveStatus, '❌ กรุณาใส่ URL Google Drive', 'error');
-                return;
-            }
-            
-            if (!url.includes('drive.google.com')) {
-                setStatus(driveStatus, '❌ URL ไม่ถูกต้อง กรุณาใส่ URL Google Drive ที่ถูกต้อง', 'error');
-                return;
-            }
-            
-            const folderId = extractFolderId(url);
-            if (!folderId) {
-                setStatus(driveStatus, '❌ ไม่สามารถดึง Folder ID ได้', 'error');
-                return;
-            }
-            
-            log(`Extracting folder ID: ${folderId}`);
-            
-            fetchDriveBtn.disabled = true;
-            fetchDriveBtn.textContent = '🔄 กำลังดึงข้อมูล...';
-            setStatus(driveStatus, '⏳ กำลังดึงรายการไฟล์...', 'info');
-            
-            try {
-                log('Listing files in Drive folder...');
-                
-                const response = await gapi.client.drive.files.list({
-                    q: `'${folderId}' in parents and (mimeType contains 'image/')`,
-                    fields: 'files(id, name, mimeType, webContentLink, size)',
-                    pageSize: 100
-                });
-                
-                const files = response.result.files;
-                log(`Found ${files.length} image files`);
-                
-                if (!files || files.length === 0) {
-                    setStatus(driveStatus, '⚠️ ไม่พบรูปภาพใน Folder นี้', 'warning');
-                    return;
-                }
-                
-                setStatus(driveStatus, `✅ พบรูปภาพ ${files.length} ไฟล์ กำลังดาวน์โหลด...`, 'success');
-                
-                // Download files (limit to first 5 for testing)
-                const limitedFiles = files.slice(0, 5);
-                log(`Downloading ${limitedFiles.length} files...`);
-                
-                const downloadPromises = limitedFiles.map(async (file, index) => {
-                    try {
-                        log(`Downloading file ${index + 1}/${limitedFiles.length}: ${file.name}`);
-                        
-                        const resp = await gapi.client.drive.files.get({
-                            fileId: file.id,
-                            alt: 'media'
-                        });
-                        
-                        // CORRECTED: Convert raw string response to Blob
-                        const byteCharacters = atob(btoa(resp.body)); // Re-encode to handle binary data correctly
-                        const byteNumbers = new Array(byteCharacters.length);
-                        for (let i = 0; i < byteCharacters.length; i++) {
-                            byteNumbers[i] = byteCharacters.charCodeAt(i);
-                        }
-                        const byteArray = new Uint8Array(byteNumbers);
-                        const blob = new Blob([byteArray], { type: file.mimeType });
-                        
-                        if (blob.size === 0) {
-                            log(`❌ File ${file.name} has zero size`, 'error');
-                            return null;
-                        }
-                        
-                        const fileObj = new File([blob], file.name, { type: file.mimeType });
-                        
-                        log(`Successfully downloaded: ${file.name} (${blob.size} bytes)`);
-                        return fileObj;
-                        
-                    } catch (error) {
-                        log(`Failed to download ${file.name}: ${error.message}`, 'error');
-                        return null;
-                    }
-                });
-                
-                const downloadedFiles = await Promise.all(downloadPromises);
-                const validFiles = downloadedFiles.filter(f => f !== null);
-                
-                if (validFiles.length > 0) {
-                    selectedFiles = validFiles;
-                    processBtn.disabled = false;
-                    setStatus(driveStatus, `✅ ดาวน์โหลดสำเร็จ ${validFiles.length} ไฟล์`, 'success');
-                    log(`Ready to process ${validFiles.length} files`);
-                } else {
-                    setStatus(driveStatus, '❌ ไม่สามารถดาวน์โหลดไฟล์ได้', 'error');
-                }
-                
-            } catch (error) {
-                log(`Drive fetch error: ${error.message}`, 'error');
-                setStatus(driveStatus, `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
-            } finally {
-                fetchDriveBtn.disabled = false;
-                fetchDriveBtn.textContent = '📥 ดึงภาพจาก Drive';
-            }
-        });
-
-        // === Extract Folder ID ===
-        function extractFolderId(url) {
-            const patterns = [
-                /\/folders\/([a-zA-Z0-9-_]+)/,
-                /[?&]id=([a-zA-Z0-9-_]+)/
-            ];
-            
-            for (const pattern of patterns) {
-                const match = url.match(pattern);
-                if (match) return match[1];
-            }
-            return null;
-        }
-
-        // === File Input Handler ===
-        fileInput.addEventListener('change', (event) => {
-            const files = Array.from(event.target.files);
-            selectedFiles = files;
-            processBtn.disabled = files.length === 0;
-            log(`Selected ${files.length} files via file input`);
-        });
-
-        // === Process Files ===
-        processBtn.addEventListener('click', async () => {
-            if (selectedFiles.length === 0) return;
-            
-            log(`Starting to process ${selectedFiles.length} files...`);
-            processBtn.disabled = true;
-            processBtn.textContent = '🔄 กำลังประมวลผล...';
-            
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
-                log(`Processing file ${i + 1}/${selectedFiles.length}: ${file.name}`);
-                
-                const formData = new FormData();
-                formData.append('file', file);
-                
-                try {
-                    const response = await fetch('https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        log(`✅ Processed successfully: ${file.name}`);
-                        console.log('Response data:', data);
-                    } else {
-                        log(`❌ Failed to process ${file.name}: ${response.statusText}`, 'error');
-                    }
-                    
-                } catch (error) {
-                    log(`❌ Error processing ${file.name}: ${error.message}`, 'error');
-                }
-            }
-            
-            processBtn.disabled = false;
-            processBtn.textContent = '⚡ ประมวลผลไฟล์';
-            log('Processing completed!');
-        });
-
-        // === Initialize ===
-        window.onload = async function() {
-            log('Application starting with OAuth-only configuration...');
-
-            // Try to load external config, but fallback to embedded config
-            try {
-                log('Attempting to load configuration from env.js...');
-                const externalConfig = (await import('./env.js')).default;
-                CONFIG = { ...CONFIG, ...externalConfig };
-                log('Successfully loaded and merged env.js');
-
-                // mask secret for safe display (do NOT print full secret)
-                function maskSecret(s) {
-                    if (!s) return '(missing)';
-                    if (s.length <= 8) return '****';
-                    return s.slice(0,4) + '...' + s.slice(-4);
-                }
-                const maskedClientId = maskSecret(CONFIG.CLIENT_ID);
-                const maskedApiKey = maskSecret(CONFIG.API_KEY);
-                log(`Secrets loaded (masked): CLIENT_ID=${maskedClientId}, API_KEY=${maskedApiKey}`, 'info');
-                console.info('DEBUG: secrets presence:',
-                    { clientIdPresent: !!CONFIG.CLIENT_ID, apiKeyPresent: !!CONFIG.API_KEY });
-                // show in-page status for quick visual check
-                setStatus(configStatus, `✅ Config loaded (CLIENT_ID=${maskedClientId})`, 'success');
-            } catch (e) {
-                log('env.js not found, using embedded OAuth configuration', 'info');
-            }
-            
-            // Check if Google API script is loaded
-            if (window.gapi) {
-                log('Google API script loaded successfully');
-            } else {
-                log('Google API script not loaded', 'error');
-                setStatus(googleApiStatus, '❌ Google API Script ไม่ได้โหลด', 'error');
-            }
-            
-            // Check configuration
-            const configOK = checkConfiguration();
-            
-            if (!configOK) {
-                log('Configuration incomplete - please check CLIENT_ID', 'error');
-                testGoogleApiBtn.disabled = true;
-            }
-            
-            log('Application initialization completed');
-        };
+        // เริ่มต้น
+        loadGoogleIdentity();
     </script>
 </body>
 </html>
