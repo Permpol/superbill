@@ -37,6 +37,9 @@ jobs:
           export default CONFIG;
           EOF
 
+      - name: Display env.js content
+        run: cat env.js  # <-- เพิ่มบรรทัดนี้
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
