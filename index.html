@@ -681,13 +681,18 @@
             const durationAllSec = ((endTimeAll - startTimeAll) / 1000).toFixed(2);
             const durationAllMin = (durationAllSec / 60).toFixed(2);
 
-            createTotalSummaryMessage({
-                fileCount: selectedFiles.length,
-                startDateAll,
-                endDateAll,
-                durationAllSec,
-                durationAllMin
-            });
+            // หลังจาก loop ประมวลผลเสร็จ
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'summary-card';
+            summaryDiv.innerHTML = `
+                <h3>📊 สรุปผลการประมวลผล</h3>
+                <div>✅ สำเร็จ: ${successCount} ไฟล์</div>
+                <div>❌ ล้มเหลว: ${failCount} ไฟล์</div>
+                <div>⏱ ใช้เวลา: ${durationAllSec} วินาที</div>`;
+            resultsContainer.insertBefore(summaryDiv, resultsContainer.firstChild);
 
             // hide status after short delay
             setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
@@ -827,6 +832,17 @@
                 }
 
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
+                // แสดงผลลัพธ์จาก server
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result-card';
+                resultDiv.innerHTML = `
+                    <div class="status success">
+                        ✅ ประมวลผลสำเร็จ: <strong>${escapeHtml(file.name)}</strong>
+                    </div>
+                    <div class="raw-data-container">
+                        ${JSON.stringify(payload, null, 2)}
+                    </div>`;
+                resultsContainer.appendChild(resultDiv);
 
                 return { success: true, fileName: file.name, data: payload };
 
