@@ -952,37 +952,40 @@
             document.body.removeChild(link);
         }
 
-        // === Create Horizontal Data Table (used by createResultMessage) ===
-        function createHorizontalDataTable(data) {
-            if (!data || typeof data !== 'object') return '';
-            
-            let html = '<div class="horizontal-table-container"><table class="horizontal-table">';
-            
-            const entries = Object.entries(data);
-            // headers
-            html += '<thead><tr>';
-            entries.forEach(([key]) => {
-                html += `<th>${escapeHtml(key)}</th>`;
-            });
-            html += '</tr></thead>';
-            
-            // values
-            html += '<tbody><tr>';
-            entries.forEach(([, value]) => {
-                let display = value;
-                if (typeof value === 'object') display = JSON.stringify(value, null, 2);
-                html += `<td title="${escapeHtml(String(display))}">${escapeHtml(String(display))}</td>`;
-            });
-            html += '</tr></tbody>';
-            
-            html += '</table></div>';
-            return html;
+        // === Helper Functions ===
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
-        // === Create Result Card for a single file ===
-        function createResultMessage(fileName, payload, timeInfo = {}) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'result-card';
-
-            let timeHtml = '';
-            if
+        // === Initialize on Load ===
+        window.onload = function() {
+            log('Application starting with integrated bill processing...');
+            
+            // Check configuration
+            if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.includes('YOUR_')) {
+                setStatus(configStatus, '❌ CLIENT_ID ไม่ได้ตั้งค่า', 'error');
+                log('Configuration incomplete - please check CLIENT_ID', 'error');
+                return;
+            } else {
+                setStatus(configStatus, '✅ OAuth Configuration ครบถ้วน (ไม่ต้อง API Key)', 'success');
+                log('OAuth Configuration OK - no API Key needed', 'success');
+            }
+            
+            // Wait for Google Identity Services to load
+            const checkGoogleIdentity = setInterval(() => {
+                if (window.google && window.google.accounts) {
+                    clearInterval(checkGoogleIdentity);
+                    initializeGoogleIdentity();
+                }
+            }, 100);
+            
+            log('Application initialization completed');
+        };
+    </script>
+</body>
+</html>
