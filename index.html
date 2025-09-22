@@ -489,50 +489,54 @@
 
         // === Fetch from Google Drive ===
         fetchDriveBtn.addEventListener('click', async () => {
-            const url = googleDriveUrl.value.trim();
+        const url = googleDriveUrl.value.trim();
+        
+        if (!url) {
+            setStatus(driveStatus, '❌ กรุณาใส่ URL Google Drive', 'error');
+            return;
+        }
+        
+        const folderId = extractFolderId(url);
+        if (!folderId) {
+            setStatus(driveStatus, '❌ ไม่สามารถดึง Folder ID ได้', 'error');
+            return;
+        }
+        
+        log(`Extracting folder ID: ${folderId}`);
+        
+        fetchDriveBtn.disabled = true;
+        fetchDriveBtn.textContent = '🔄 กำลังดึงข้อมูล...';
+        setStatus(driveStatus, '⏳ กำลังดึงรายการไฟล์...', 'info');
+        
+        try {
+            // ใช้ฟังก์ชันใหม่ที่รองรับ pagination
+            const files = await fetchAllFilesFromFolder(folderId);
             
-            if (!url) {
-                setStatus(driveStatus, '❌ กรุณาใส่ URL Google Drive', 'error');
+            if (!files || files.length === 0) {
+                setStatus(driveStatus, '⚠️ ไม่พบรูปภาพใน Folder นี้', 'warning');
                 return;
             }
             
-            const folderId = extractFolderId(url);
-            if (!folderId) {
-                setStatus(driveStatus, '❌ ไม่สามารถดึง Folder ID ได้', 'error');
-                return;
-            }
+            setStatus(driveStatus, `✅ พบรูปภาพ ${files.length} ไฟล์ กำลังดาวน์โหลด...`, 'success');
             
-            log(`Extracting folder ID: ${folderId}`);
+            // จำกัดจำนวนการดาวน์โหลดพร้อมกัน
+            const BATCH_SIZE = 10;  // ดาวน์โหลดทีละ 10 ไฟล์
+            driveFiles = [];
             
-            fetchDriveBtn.disabled = true;
-            fetchDriveBtn.textContent = '🔄 กำลังดึงข้อมูล...';
-            setStatus(driveStatus, '⏳ กำลังดึงรายการไฟล์...', 'info');
-            
-            try {
-                const response = await gapi.client.drive.files.list({
-                    q: `'${folderId}' in parents and (mimeType contains 'image/')`,
-                    fields: 'files(id, name, mimeType, webContentLink, size)',
-                    pageSize: 100
-                });
+            for (let i = 0; i < files.length; i += BATCH_SIZE) {
+                const batch = files.slice(i, i + BATCH_SIZE);
+                const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+                const totalBatches = Math.ceil(files.length / BATCH_SIZE);
                 
-                const files = response.result.files;
-                log(`Found ${files.length} image files`);
+                setStatus(driveStatus, `📥 ดาวน์โหลด batch ${batchNumber}/${totalBatches}...`, 'info');
                 
-                if (!files || files.length === 0) {
-                    setStatus(driveStatus, '⚠️ ไม่พบรูปภาพใน Folder นี้', 'warning');
-                    return;
-                }
-                
-                setStatus(driveStatus, `✅ พบรูปภาพ ${files.length} ไฟล์ กำลังดาวน์โหลด...`, 'success');
-                
-                // Download files
-                driveFiles = [];
-                const downloadPromises = files.map(async (file, index) => {
+                const downloadPromises = batch.map(async (file, index) => {
                     try {
-                        log(`Downloading file ${index + 1}/${files.length}: ${file.name}`);
+                        const fileIndex = i + index + 1;
+                        log(`Downloading file ${fileIndex}/${files.length}: ${file.name}`);
 
                         if (!accessToken) {
-                            throw new Error('No OAuth access token (accessToken is null). Please sign in and allow Drive access.');
+                            throw new Error('No OAuth access token');
                         }
 
                         const url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
@@ -541,42 +545,48 @@
                         });
 
                         if (!resp.ok) {
-                            const txt = await resp.text().catch(()=>'');
-                            throw new Error(`HTTP ${resp.status} ${resp.statusText}${txt ? ' - '+txt.slice(0,200) : ''}`);
+                            throw new Error(`HTTP ${resp.status}`);
                         }
 
                         const blob = await resp.blob();
                         if (!blob || blob.size === 0) {
-                            throw new Error('Downloaded blob is empty');
+                            throw new Error('Empty file');
                         }
 
-                        const fileObj = new File([blob], file.name, { type: file.mimeType });
-                        return fileObj;
+                        return new File([blob], file.name, { type: file.mimeType });
+                        
                     } catch (error) {
                         log(`Failed to download ${file.name}: ${error.message}`, 'error');
                         return null;
                     }
                 });
                 
-                const downloadedFiles = await Promise.all(downloadPromises);
-                driveFiles = downloadedFiles.filter(f => f !== null);
+                const batchResults = await Promise.all(downloadPromises);
+                const validFiles = batchResults.filter(f => f !== null);
+                driveFiles = driveFiles.concat(validFiles);
                 
-                if (driveFiles.length > 0) {
-                    // Add to selected files
-                    selectedFiles = [...selectedFiles, ...driveFiles];
-                    updateSelectedFilesList();
-                    setStatus(driveStatus, `✅ ดาวน์โหลดสำเร็จ ${driveFiles.length} ไฟล์`, 'success');
-                    log(`Ready to process ${driveFiles.length} files from Drive`);
-                }
-                
-            } catch (error) {
-                log(`Drive fetch error: ${error.message}`, 'error');
-                setStatus(driveStatus, `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
-            } finally {
-                fetchDriveBtn.disabled = false;
-                fetchDriveBtn.textContent = '📥 ดึงภาพจาก Drive';
+                // อัพเดท progress
+                const progress = Math.round((i + batch.length) / files.length * 100);
+                setStatus(driveStatus, `📥 ดาวน์โหลดแล้ว ${driveFiles.length}/${files.length} ไฟล์ (${progress}%)`, 'info');
             }
-        });
+            
+            if (driveFiles.length > 0) {
+                selectedFiles = [...selectedFiles, ...driveFiles];
+                updateSelectedFilesList();
+                setStatus(driveStatus, `✅ ดาวน์โหลดสำเร็จ ${driveFiles.length} ไฟล์`, 'success');
+                log(`Ready to process ${driveFiles.length} files from Drive`);
+            } else {
+                setStatus(driveStatus, '⚠️ ไม่สามารถดาวน์โหลดไฟล์ได้', 'warning');
+            }
+            
+        } catch (error) {
+            log(`Drive fetch error: ${error.message}`, 'error');
+            setStatus(driveStatus, `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+        } finally {
+            fetchDriveBtn.disabled = false;
+            fetchDriveBtn.textContent = '🔥 ดึงภาพจาก Drive';
+        }
+    });
 
         // === Extract Folder ID ===
         function extractFolderId(url) {
@@ -1038,99 +1048,99 @@
         }
 
         // === Real-time Resource Monitor === (เพิ่มตรงนี้)
-let monitorInterval = null;
-let processStartTime = null;
-let filesProcessed = 0;
-let totalBytesProcessed = 0;
+        let monitorInterval = null;
+        let processStartTime = null;
+        let filesProcessed = 0;
+        let totalBytesProcessed = 0;
 
-function createResourceMonitorUI() {
-    // ตรวจสอบว่ามี monitor อยู่แล้วหรือไม่
-    if (document.getElementById('resourceMonitor')) return;
-    
-    const monitorDiv = document.createElement('div');
-    monitorDiv.id = 'resourceMonitor';
-    monitorDiv.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 320px;
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: #fff;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-        font-family: 'Courier New', monospace;
-        font-size: 12px;
-        z-index: 10000;
-        transition: all 0.3s ease;
-    `;
-    
-    monitorDiv.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h4 style="margin: 0; font-size: 14px;">📊 Resource Monitor</h4>
-            <button onclick="toggleMonitor()" style="
-                background: rgba(255,255,255,0.2);
-                border: none;
-                color: white;
-                padding: 2px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 10px;
-            ">ย่อ/ขยาย</button>
-        </div>
-        <div id="monitorContent">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                    <strong>Memory:</strong><br>
-                    <span id="memUsage" style="font-size: 16px; color: #4fc3f7;">0</span> MB
+        function createResourceMonitorUI() {
+            // ตรวจสอบว่ามี monitor อยู่แล้วหรือไม่
+            if (document.getElementById('resourceMonitor')) return;
+            
+            const monitorDiv = document.createElement('div');
+            monitorDiv.id = 'resourceMonitor';
+            monitorDiv.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 320px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                color: #fff;
+                padding: 15px;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                z-index: 10000;
+                transition: all 0.3s ease;
+            `;
+            
+            monitorDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; font-size: 14px;">📊 Resource Monitor</h4>
+                    <button onclick="toggleMonitor()" style="
+                        background: rgba(255,255,255,0.2);
+                        border: none;
+                        color: white;
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 10px;
+                    ">ย่อ/ขยาย</button>
                 </div>
-                <div>
-                    <strong>CPU Time:</strong><br>
-                    <span id="cpuTime" style="font-size: 16px; color: #81c784;">0</span> s
+                <div id="monitorContent">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <strong>Memory:</strong><br>
+                            <span id="memUsage" style="font-size: 16px; color: #4fc3f7;">0</span> MB
+                        </div>
+                        <div>
+                            <strong>CPU Time:</strong><br>
+                            <span id="cpuTime" style="font-size: 16px; color: #81c784;">0</span> s
+                        </div>
+                        <div>
+                            <strong>Files:</strong><br>
+                            <span id="fileCount" style="font-size: 16px; color: #ffb74d;">0</span> / <span id="totalFiles">0</span>
+                        </div>
+                        <div>
+                            <strong>Speed:</strong><br>
+                            <span id="processSpeed" style="font-size: 16px; color: #ba68c8;">0</span> f/min
+                        </div>
+                    </div>
+                    <hr style="margin: 10px 0; border: 1px solid rgba(255,255,255,0.2);">
+                    <div>
+                        <strong>Progress:</strong>
+                        <div style="background: rgba(255,255,255,0.2); border-radius: 5px; overflow: hidden; margin-top: 5px;">
+                            <div id="progressBar" style="
+                                height: 20px;
+                                background: linear-gradient(90deg, #4fc3f7, #81c784);
+                                width: 0%;
+                                transition: width 0.3s ease;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-size: 11px;
+                            ">0%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 10px; color: rgba(255,255,255,0.7);">
+                        <div>Heap Limit: <span id="heapLimit">0</span> MB</div>
+                        <div>Network: <span id="bandwidth">0</span> KB/s</div>
+                    </div>
                 </div>
-                <div>
-                    <strong>Files:</strong><br>
-                    <span id="fileCount" style="font-size: 16px; color: #ffb74d;">0</span> / <span id="totalFiles">0</span>
-                </div>
-                <div>
-                    <strong>Speed:</strong><br>
-                    <span id="processSpeed" style="font-size: 16px; color: #ba68c8;">0</span> f/min
-                </div>
-            </div>
-            <hr style="margin: 10px 0; border: 1px solid rgba(255,255,255,0.2);">
-            <div>
-                <strong>Progress:</strong>
-                <div style="background: rgba(255,255,255,0.2); border-radius: 5px; overflow: hidden; margin-top: 5px;">
-                    <div id="progressBar" style="
-                        height: 20px;
-                        background: linear-gradient(90deg, #4fc3f7, #81c784);
-                        width: 0%;
-                        transition: width 0.3s ease;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 11px;
-                    ">0%</div>
-                </div>
-            </div>
-            <div style="margin-top: 10px; font-size: 10px; color: rgba(255,255,255,0.7);">
-                <div>Heap Limit: <span id="heapLimit">0</span> MB</div>
-                <div>Network: <span id="bandwidth">0</span> KB/s</div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(monitorDiv);
-    startMonitoring();
-    }
+            `;
+            
+            document.body.appendChild(monitorDiv);
+            startMonitoring();
+            }
 
-    function startMonitoring() {
-        if (monitorInterval) clearInterval(monitorInterval);
-        
-        monitorInterval = setInterval(() => {
-            updateMonitorDisplay();
-        }, 500); // Update every 500ms
-    }
+            function startMonitoring() {
+                if (monitorInterval) clearInterval(monitorInterval);
+                
+                monitorInterval = setInterval(() => {
+                    updateMonitorDisplay();
+                }, 500); // Update every 500ms
+            }
 
     function updateMonitorDisplay() {
         // Memory usage
@@ -1188,6 +1198,46 @@ function createResourceMonitorUI() {
         stopMonitoring();
         const monitor = document.getElementById('resourceMonitor');
         if (monitor) monitor.remove();
+    }
+
+    // ฟังก์ชันดึงไฟล์ทั้งหมดจาก folder (รองรับมากกว่า 1000 ไฟล์)
+    async function fetchAllFilesFromFolder(folderId) {
+        let allFiles = [];
+        let nextPageToken = null;
+        let pageNumber = 0;
+        
+        try {
+            do {
+                pageNumber++;
+                log(`Fetching page ${pageNumber}...`);
+                
+                const response = await gapi.client.drive.files.list({
+                    q: `'${folderId}' in parents and (mimeType contains 'image/')`,
+                    fields: 'files(id, name, mimeType, webContentLink, size), nextPageToken',
+                    pageSize: 2500,  // ใช้ค่าสูงสุดที่ API อนุญาต
+                    pageToken: nextPageToken
+                });
+                
+                const files = response.result.files || [];
+                allFiles = allFiles.concat(files);
+                
+                log(`Page ${pageNumber}: Found ${files.length} files (Total: ${allFiles.length})`);
+                
+                // อัพเดท status
+                setStatus(driveStatus, `📥 กำลังดึงข้อมูล... พบไฟล์ ${allFiles.length} ไฟล์`, 'info');
+                
+                // ตรวจสอบว่ามีหน้าถัดไปหรือไม่
+                nextPageToken = response.result.nextPageToken;
+                
+            } while (nextPageToken);
+            
+            log(`Completed: Total ${allFiles.length} image files found`);
+            return allFiles;
+            
+        } catch (error) {
+            log(`Error fetching files: ${error.message}`, 'error');
+            throw error;
+        }
     }
 
         // === Initialize on Load ===
