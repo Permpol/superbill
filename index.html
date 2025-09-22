@@ -820,7 +820,7 @@
 
             try {
                 const apiBase = (CONFIG && CONFIG.API_ENDPOINT) ? String(CONFIG.API_ENDPOINT).replace(/\/+$/g, '') : '';
-                const endpoint = apiBase ? `${apiBase}/webhook/aip1` : 'https://allie-capacitive-kaiden.ngrok-free.app/webhook-test/aip1';
+                const endpoint = apiBase ? `${apiBase}/webhook/aip1` : 'https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1';
 
                 const res = await fetch(endpoint, {
                     method: 'POST',

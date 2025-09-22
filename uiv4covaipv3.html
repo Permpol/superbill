@@ -523,7 +523,7 @@ async function processSingleFile(file) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     try {
-        const res = await fetch("https://allie-capacitive-kaiden.ngrok-free.app/webhook/aip1", {
+        const res = await fetch("https://allie-capacitive-kaiden.ngrok-free.app/webhook-test/aip1", {
             method: "POST",
             body: formData
         });
