@@ -1214,7 +1214,7 @@
                 const response = await gapi.client.drive.files.list({
                     q: `'${folderId}' in parents and (mimeType contains 'image/')`,
                     fields: 'files(id, name, mimeType, webContentLink, size), nextPageToken',
-                    pageSize: 2500,  // ใช้ค่าสูงสุดที่ API อนุญาต
+                    pageSize: 1000,  // ใช้ค่าสูงสุดที่ API อนุญาต
                     pageToken: nextPageToken
                 });
                 
