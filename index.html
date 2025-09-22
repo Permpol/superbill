@@ -512,7 +512,7 @@
                 const response = await gapi.client.drive.files.list({
                     q: `'${folderId}' in parents and (mimeType contains 'image/')`,
                     fields: 'files(id, name, mimeType, webContentLink, size)',
-                    pageSize: 100
+                    pageSize: 2500
                 });
                 
                 const files = response.result.files;
