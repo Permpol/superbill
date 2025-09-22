@@ -242,6 +242,16 @@
             font-size: 11px;
             white-space: pre-wrap;
         }
+        .btn-sm {
+            padding: 5px 10px !important;
+            font-size: 12px !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-sm:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -676,6 +686,7 @@
                 });
             }
 
+            // ลบ summary card เดิมออก และเปลี่ยนเป็นแสดงที่ท้ายสุด
             const endTimeAll = Date.now();
             const endDateAll = new Date(endTimeAll).toLocaleString('th-TH');
             const durationAllSec = ((endTimeAll - startTimeAll) / 1000).toFixed(2);
@@ -685,14 +696,25 @@
             const successCount = results.filter(r => r.success).length;
             const failCount = results.length - successCount;
 
+            // สร้าง summary ที่ท้ายสุดแทน summary card
             const summaryDiv = document.createElement('div');
-            summaryDiv.className = 'summary-card';
+            summaryDiv.className = 'result-card';
+            summaryDiv.style.background = '#f0f4f8';
             summaryDiv.innerHTML = `
-                <h3>📊 สรุปผลการประมวลผล</h3>
-                <div>✅ สำเร็จ: ${successCount} ไฟล์</div>
-                <div>❌ ล้มเหลว: ${failCount} ไฟล์</div>
-                <div>⏱ ใช้เวลา: ${durationAllSec} วินาที</div>`;
-            resultsContainer.insertBefore(summaryDiv, resultsContainer.firstChild);
+                <h4>📊 สรุปผลการประมวลผล</h4>
+                <hr style="margin: 10px 0;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>✅ สำเร็จ: <strong>${successCount}</strong> ไฟล์</div>
+                    <div>❌ ล้มเหลว: <strong>${failCount}</strong> ไฟล์</div>
+                    <div>📁 ทั้งหมด: <strong>${selectedFiles.length}</strong> ไฟล์</div>
+                    <div>⏱ เวลา: <strong>${durationAllSec}</strong> วินาที (${durationAllMin} นาที)</div>
+                </div>
+                <hr style="margin: 10px 0;">
+                <small style="color: #666;">
+                    เริ่ม: ${startDateAll}<br>
+                    จบ: ${endDateAll}
+                </small>`;
+            resultsContainer.appendChild(summaryDiv); // เพิ่มที่ท้ายสุด
 
             // hide status after short delay
             setTimeout(() => { statusDiv.style.display = 'none'; }, 2000);
@@ -833,13 +855,18 @@
 
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
                 // แสดงผลลัพธ์จาก server
+                // แสดงผลลัพธ์จาก server พร้อมปุ่มเปิด/ปิด
                 const resultDiv = document.createElement('div');
+                const uniqueId = `data_${taskId}`;
                 resultDiv.className = 'result-card';
                 resultDiv.innerHTML = `
                     <div class="status success">
                         ✅ ประมวลผลสำเร็จ: <strong>${escapeHtml(file.name)}</strong>
+                        <button class="btn btn-sm" onclick="toggleRawData('${uniqueId}')" style="float: right; padding: 5px 10px; font-size: 12px;">
+                            📋 แสดง/ซ่อนข้อมูล
+                        </button>
                     </div>
-                    <div class="raw-data-container">
+                    <div id="${uniqueId}" class="raw-data-container" style="display: none; margin-top: 10px;">
                         ${JSON.stringify(payload, null, 2)}
                     </div>`;
                 resultsContainer.appendChild(resultDiv);
@@ -972,6 +999,14 @@
                 .replace(/'/g, '&#39;');
         }
 
+        // === Toggle Raw Data Function ===
+        function toggleRawData(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.style.display = element.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
         // === Initialize on Load ===
         window.onload = function() {
             log('Application starting with integrated bill processing...');
@@ -996,27 +1031,7 @@
             
             log('Application initialization completed');
         };
-        function createTotalSummaryMessage(info) {
-        const resultHTML = `
-            <div class="message-content">
-                <div class="summary-card" style="background: linear-gradient(135deg,#ff512f 0%,#dd2476 100%);">
-                    <h3>📊 สรุปผลรวมทั้งหมด</h3>
-                    <div>✅ จำนวนไฟล์ที่ประมวลผล: ${info.fileCount} ไฟล์</div>
-                    <div style="margin-top:8px; font-size:13px; text-align:left;">
-                        🟢 เริ่มทั้งหมด: ${escapeHtml(info.startDateAll)}<br>
-                        🔴 จบทั้งหมด: ${escapeHtml(info.endDateAll)}<br>
-                        ⏱ ใช้เวลา: ${escapeHtml(info.durationAllSec)} วินาที (~${escapeHtml(info.durationAllMin)} นาที)
-                    </div>
-                </div>
-            </div>`;
-
-        const msgDiv = document.createElement("div");
-        msgDiv.className = "message bot";
-        msgDiv.innerHTML = resultHTML;
-
-        chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+        
     </script>
 </body>
 </html>
