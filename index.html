@@ -654,6 +654,16 @@
         processBtn.addEventListener('click', async () => {
             if (selectedFiles.length === 0) return;
 
+            // เริ่ม Resource Monitor
+            createResourceMonitorUI();
+            processStartTime = Date.now();
+            filesProcessed = 0;
+            totalBytesProcessed = 0;
+            
+            // อัพเดทจำนวนไฟล์ทั้งหมด
+            document.getElementById('totalFiles').textContent = selectedFiles.length;
+
+
             processBtn.disabled = true;
             processBtn.textContent = 'กำลังประมวลผล...';
             resultsSection.style.display = 'block';
@@ -716,6 +726,15 @@
                 </small>`;
             resultsContainer.appendChild(summaryDiv); // เพิ่มที่ท้ายสุด
 
+            // หยุด monitoring หลังจากเสร็จ
+            setTimeout(() => {
+                stopMonitoring();
+                // ซ่อน monitor หลัง 5 วินาที
+                setTimeout(() => {
+                    const monitor = document.getElementById('resourceMonitor');
+                    if (monitor) monitor.style.opacity = '0.7';
+                }, 5000);
+            }, 2000);
            
 
             processBtn.disabled = false;
@@ -853,6 +872,18 @@
                 }
 
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
+
+                // อัพเดท monitor
+                filesProcessed++;
+                totalBytesProcessed += file.size;
+
+                // อัพเดท progress bar
+                const progress = (filesProcessed / selectedFiles.length * 100).toFixed(0);
+                const progressBar = document.getElementById('progressBar');
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.textContent = `${progress}%`;
+                }
                 // แสดงผลลัพธ์จาก server
                 // แสดงผลลัพธ์จาก server พร้อมปุ่มเปิด/ปิด
                 const resultDiv = document.createElement('div');
@@ -1005,6 +1036,159 @@
                 element.style.display = element.style.display === 'none' ? 'block' : 'none';
             }
         }
+
+        // === Real-time Resource Monitor === (เพิ่มตรงนี้)
+let monitorInterval = null;
+let processStartTime = null;
+let filesProcessed = 0;
+let totalBytesProcessed = 0;
+
+function createResourceMonitorUI() {
+    // ตรวจสอบว่ามี monitor อยู่แล้วหรือไม่
+    if (document.getElementById('resourceMonitor')) return;
+    
+    const monitorDiv = document.createElement('div');
+    monitorDiv.id = 'resourceMonitor';
+    monitorDiv.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: #fff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        z-index: 10000;
+        transition: all 0.3s ease;
+    `;
+    
+    monitorDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="margin: 0; font-size: 14px;">📊 Resource Monitor</h4>
+            <button onclick="toggleMonitor()" style="
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 10px;
+            ">ย่อ/ขยาย</button>
+        </div>
+        <div id="monitorContent">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <strong>Memory:</strong><br>
+                    <span id="memUsage" style="font-size: 16px; color: #4fc3f7;">0</span> MB
+                </div>
+                <div>
+                    <strong>CPU Time:</strong><br>
+                    <span id="cpuTime" style="font-size: 16px; color: #81c784;">0</span> s
+                </div>
+                <div>
+                    <strong>Files:</strong><br>
+                    <span id="fileCount" style="font-size: 16px; color: #ffb74d;">0</span> / <span id="totalFiles">0</span>
+                </div>
+                <div>
+                    <strong>Speed:</strong><br>
+                    <span id="processSpeed" style="font-size: 16px; color: #ba68c8;">0</span> f/min
+                </div>
+            </div>
+            <hr style="margin: 10px 0; border: 1px solid rgba(255,255,255,0.2);">
+            <div>
+                <strong>Progress:</strong>
+                <div style="background: rgba(255,255,255,0.2); border-radius: 5px; overflow: hidden; margin-top: 5px;">
+                    <div id="progressBar" style="
+                        height: 20px;
+                        background: linear-gradient(90deg, #4fc3f7, #81c784);
+                        width: 0%;
+                        transition: width 0.3s ease;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 11px;
+                    ">0%</div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; font-size: 10px; color: rgba(255,255,255,0.7);">
+                <div>Heap Limit: <span id="heapLimit">0</span> MB</div>
+                <div>Network: <span id="bandwidth">0</span> KB/s</div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(monitorDiv);
+    startMonitoring();
+    }
+
+    function startMonitoring() {
+        if (monitorInterval) clearInterval(monitorInterval);
+        
+        monitorInterval = setInterval(() => {
+            updateMonitorDisplay();
+        }, 500); // Update every 500ms
+    }
+
+    function updateMonitorDisplay() {
+        // Memory usage
+        if (performance.memory) {
+            const memUsed = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+            const memLimit = (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(0);
+            document.getElementById('memUsage').textContent = memUsed;
+            document.getElementById('heapLimit').textContent = memLimit;
+        }
+        
+        // CPU time
+        if (processStartTime) {
+            const elapsed = ((Date.now() - processStartTime) / 1000).toFixed(1);
+            document.getElementById('cpuTime').textContent = elapsed;
+        }
+        
+        // Files count
+        document.getElementById('fileCount').textContent = filesProcessed;
+        
+        // Processing speed
+        if (processStartTime && filesProcessed > 0) {
+            const elapsedMin = (Date.now() - processStartTime) / 60000;
+            const speed = (filesProcessed / elapsedMin).toFixed(1);
+            document.getElementById('processSpeed').textContent = speed;
+        }
+        
+        // Bandwidth (approximate)
+        if (totalBytesProcessed > 0 && processStartTime) {
+            const elapsedSec = (Date.now() - processStartTime) / 1000;
+            const bandwidth = ((totalBytesProcessed / 1024) / elapsedSec).toFixed(1);
+            document.getElementById('bandwidth').textContent = bandwidth;
+        }
+    }
+
+    function toggleMonitor() {
+        const content = document.getElementById('monitorContent');
+        const monitor = document.getElementById('resourceMonitor');
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            monitor.style.width = '320px';
+        } else {
+            content.style.display = 'none';
+            monitor.style.width = '150px';
+        }
+    }
+
+    function stopMonitoring() {
+        if (monitorInterval) {
+            clearInterval(monitorInterval);
+            monitorInterval = null;
+        }
+    }
+
+    function removeMonitor() {
+        stopMonitoring();
+        const monitor = document.getElementById('resourceMonitor');
+        if (monitor) monitor.remove();
+    }
 
         // === Initialize on Load ===
         window.onload = function() {
