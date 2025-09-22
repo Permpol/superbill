@@ -828,12 +828,6 @@
 
                 if (statusDiv) updateTaskStatus(statusDiv, taskId, file.name, 'completed');
 
-                createResultMessage(file.name, payload, {
-                    startDateStr: new Date(startTime).toLocaleString('th-TH'),
-                    endDateStr: new Date().toLocaleString('th-TH'),
-                    durationSec: ((Date.now() - startTime) / 1000).toFixed(2)
-                });
-
                 return { success: true, fileName: file.name, data: payload };
 
             } catch (error) {
@@ -986,6 +980,27 @@
             
             log('Application initialization completed');
         };
+        function createTotalSummaryMessage(info) {
+        const resultHTML = `
+            <div class="message-content">
+                <div class="summary-card" style="background: linear-gradient(135deg,#ff512f 0%,#dd2476 100%);">
+                    <h3>📊 สรุปผลรวมทั้งหมด</h3>
+                    <div>✅ จำนวนไฟล์ที่ประมวลผล: ${info.fileCount} ไฟล์</div>
+                    <div style="margin-top:8px; font-size:13px; text-align:left;">
+                        🟢 เริ่มทั้งหมด: ${escapeHtml(info.startDateAll)}<br>
+                        🔴 จบทั้งหมด: ${escapeHtml(info.endDateAll)}<br>
+                        ⏱ ใช้เวลา: ${escapeHtml(info.durationAllSec)} วินาที (~${escapeHtml(info.durationAllMin)} นาที)
+                    </div>
+                </div>
+            </div>`;
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message bot";
+        msgDiv.innerHTML = resultHTML;
+
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
     </script>
 </body>
 </html>
